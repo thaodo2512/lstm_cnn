@@ -6,21 +6,17 @@
   "timeframe": "1h",
   "dry_run": true,
   "strategy": "FreqAIHybridExample",
-  "pairlists": [
-    {
-      "method": "StaticPairList",
-      "config": {
-        "pair_whitelist": ["BTC/USDT"],
-        "pair_blacklist": []
-      }
-    }
-  ],
   "exchange": {
     "name": "binance",
     "key": "",
     "secret": "",
     "ccxt_config": { "enableRateLimit": true },
-    "ccxt_async_config": { "enableRateLimit": true }
+    "ccxt_async_config": { "enableRateLimit": true },
+    "pair_whitelist": ["BTC/USDT"],
+    "pair_blacklist": [],
+    "pairlists": [
+      { "method": "StaticPairList" }
+    ]
   },
   "freqai": {
     "enabled": true,
