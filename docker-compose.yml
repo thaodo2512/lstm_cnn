@@ -1,0 +1,72 @@
+version: "3.9"
+
+services:
+  crypto-train-gpu-l4:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.gpu.x86
+    container_name: crypto_train_gpu_l4
+    # Enable all GPUs (requires nvidia-container-toolkit on host)
+    gpus: all
+    restart: unless-stopped
+    shm_size: "2g"  # more shared memory for DataLoader workers
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+      TORCH_CUDA_ARCH_LIST: "8.9"   # NVIDIA L4 SM 89
+      PYTHONFAULTHANDLER: "1"
+      PYTHONUNBUFFERED: "1"
+      PYTHONWARNINGS: default
+      MPLBACKEND: Agg
+      # Configure training via envs (compose can pass overrides)
+      EPOCHS: ${EPOCHS:-10}
+      HORIZON: ${HORIZON:-1}
+      BATCH_SIZE: ${BATCH_SIZE:-32}
+      WINDOW_SIZE: ${WINDOW_SIZE:-60}
+      STRIDE: ${STRIDE:-1}
+      SOURCE: ${SOURCE:-auto}
+      CLASSIFICATION: ${CLASSIFICATION:-false}
+    volumes:
+      - ./:/workspace
+      - ./artifacts:/workspace/artifacts
+    working_dir: /workspace
+    command: [
+      "python", "hybrid_lstm_transformer_crypto.py",
+      "--epochs", "${EPOCHS:-10}",
+      "--horizon", "${HORIZON:-1}",
+      "--batch_size", "${BATCH_SIZE:-32}",
+      "--window_size", "${WINDOW_SIZE:-60}",
+      "--stride", "${STRIDE:-1}",
+      "--source", "${SOURCE:-auto}",
+      "--out_dir", "artifacts"
+    ]
+
+  # Optional: classification run example (commented). Enable by uncommenting.
+  # crypto-train-gpu-l4-cls:
+  #   build:
+  #     context: .
+  #     dockerfile: docker/Dockerfile.gpu.x86
+  #   container_name: crypto_train_gpu_l4_cls
+  #   gpus: all
+  #   restart: unless-stopped
+  #   shm_size: "2g"
+  #   environment:
+  #     NVIDIA_VISIBLE_DEVICES: all
+  #     NVIDIA_DRIVER_CAPABILITIES: compute,utility
+  #     TORCH_CUDA_ARCH_LIST: "8.9"
+  #     MPLBACKEND: Agg
+  #   volumes:
+  #     - ./:/workspace
+  #     - ./artifacts_cls:/workspace/artifacts
+  #   working_dir: /workspace
+  #   command: [
+  #     "python", "hybrid_lstm_transformer_crypto.py",
+  #     "--classification",
+  #     "--epochs", "${EPOCHS:-10}",
+  #     "--batch_size", "${BATCH_SIZE:-32}",
+  #     "--window_size", "${WINDOW_SIZE:-60}",
+  #     "--stride", "${STRIDE:-1}",
+  #     "--source", "${SOURCE:-auto}",
+  #     "--out_dir", "artifacts"
+  #   ]
+

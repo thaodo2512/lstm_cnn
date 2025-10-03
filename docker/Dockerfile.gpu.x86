@@ -1,0 +1,29 @@
+# GPU-enabled image for x86 with NVIDIA (tested on L4)
+# Uses official PyTorch CUDA runtime to simplify setup
+FROM pytorch/pytorch:2.3.1-cuda12.1-cudnn8-runtime
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    MPLBACKEND=Agg \
+    TORCH_CUDA_ARCH_LIST=8.9 \
+    PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        git build-essential ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Python deps (minimal set used by the script)
+RUN pip install --no-cache-dir \
+        numpy pandas scikit-learn matplotlib \
+        ccxt yfinance pandas_datareader
+
+WORKDIR /workspace
+
+# Copy the repo to the image (compose will also mount it for dev loops)
+COPY . /workspace
+
+# Default command can be overridden by docker compose
+CMD ["python", "hybrid_lstm_transformer_crypto.py", "--epochs", "10", "--out_dir", "artifacts"]
+

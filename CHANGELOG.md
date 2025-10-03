@@ -18,3 +18,6 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
   - Attention: Optional self-attention capture and heatmap.
   - FreqAI: Example BasePyTorchModel-compatible wrapper and config snippet.
 
+### DevOps
+- `docker/Dockerfile.gpu.x86` — GPU-enabled Dockerfile (x86, NVIDIA L4/SM 8.9) using PyTorch CUDA runtime.
+- `docker-compose.yml` — Compose service `crypto-train-gpu-l4` to train with GPU and map artifacts.
