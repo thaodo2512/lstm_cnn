@@ -1,39 +1,101 @@
 from __future__ import annotations
 
-from freqtrade.strategy.interface import IStrategy
+from freqtrade.strategy import IStrategy
+from freqtrade.freqai.Freqai import IFreqaiInterface
 from pandas import DataFrame
+import pandas as pd
+
+try:
+    from ta.momentum import RSIIndicator
+    from ta.trend import EMAIndicator, ADXIndicator
+except Exception:  # pragma: no cover - optional dependency
+    RSIIndicator = EMAIndicator = ADXIndicator = None  # type: ignore
 
 
-class FreqAIHybridExample(IStrategy):
+class FreqAIHybridExample(IStrategy, IFreqaiInterface):
     """
-    Minimal example strategy that consumes FreqAI predictions.
+    Strategy that consumes FreqAI predictions.
 
-    Expects FreqAI to add either:
-      - 'prediction' (regression, next-step price), or
-      - 'pred_up_prob' (classification probability for up move)
+    FreqAI injects columns like '&-prediction' (regression) and 'do_predict'.
+    Ensure your config uses model_classname: "HybridTimeseriesFreqAIModel".
     """
 
     timeframe = "1h"
     minimal_roi = {"0": 0.02}
-    stoploss = -0.1
+    stoploss = -0.10
+    # Allow enough history for indicators and label shifts
+    startup_candle_count: int = 240
 
-    def populate_indicators(self, df: DataFrame, metadata: dict) -> DataFrame:
-        # Predictions are injected by FreqAI. Nothing custom here.
+    def populate_indicators(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
+        # Trigger FreqAI pipeline (training/prediction and column injection)
+        dataframe = self.freqai.start(dataframe, metadata, self)
+        return dataframe
+
+    # --------- FreqAI required hooks ---------
+    def set_freqai_targets(self, dataframe: DataFrame, metadata: dict, **kwargs) -> DataFrame:
+        """Define target '&-prediction' as mean of future closes over label_period."""
+        label_period = int(self.freqai_info.get("feature_parameters", {}).get("label_period_candles", 24))
+        df = dataframe.copy()
+        df["&-prediction"] = df["close"].shift(-label_period).rolling(label_period).mean()
         return df
 
-    def populate_buy_trend(self, df: DataFrame, metadata: dict) -> DataFrame:
-        df["buy"] = 0
-        if "prediction" in df.columns:
-            df.loc[(df["prediction"] > df["close"] * 1.001), "buy"] = 1
-        elif "pred_up_prob" in df.columns:
-            df.loc[(df["pred_up_prob"] > 0.55), "buy"] = 1
+    def feature_engineering_expand_all(self, dataframe: DataFrame, period: int, metadata: dict, **kwargs) -> DataFrame:
+        """Create period-dependent features (expanded by FreqAI across periods/timeframes)."""
+        df = dataframe.copy()
+        if RSIIndicator is not None:
+            df["%-rsi"] = RSIIndicator(close=df["close"], window=period).rsi()
+            df["%-ema"] = EMAIndicator(close=df["close"], window=period).ema_indicator()
+            df["%-adx"] = ADXIndicator(high=df["high"], low=df["low"], close=df["close"], window=period).adx()
+        else:
+            # Fallback: EMA + RSI (Wilder) via pandas
+            df["%-ema"] = df["close"].ewm(span=period, adjust=False).mean()
+            delta = df["close"].diff()
+            up = delta.clip(lower=0)
+            down = -delta.clip(upper=0)
+            roll_up = up.ewm(alpha=1/14, adjust=False).mean()
+            roll_down = down.ewm(alpha=1/14, adjust=False).mean()
+            rs = roll_up / roll_down.replace(0, pd.NA)
+            df["%-rsi"] = 100 - (100 / (1 + rs))
         return df
 
-    def populate_sell_trend(self, df: DataFrame, metadata: dict) -> DataFrame:
-        df["sell"] = 0
-        if "prediction" in df.columns:
-            df.loc[(df["prediction"] < df["close"] * 0.999), "sell"] = 1
-        elif "pred_up_prob" in df.columns:
-            df.loc[(df["pred_up_prob"] < 0.45), "sell"] = 1
+    def feature_engineering_expand_basic(self, dataframe: DataFrame, metadata: dict, **kwargs) -> DataFrame:
+        df = dataframe.copy()
+        df["%-pct_change"] = df["close"].pct_change()
+        df["%-volume"] = df["volume"]
         return df
 
+    def feature_engineering_standard(self, dataframe: DataFrame, metadata: dict, **kwargs) -> DataFrame:
+        df = dataframe.copy()
+        if "date" in df.columns:
+            df["%-day_of_week"] = df["date"].dt.dayofweek / 6.0
+            df["%-hour_of_day"] = df["date"].dt.hour / 23.0
+        return df
+
+    # --------- Entry/Exit using new API ---------
+    def populate_entry_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
+        df = dataframe.copy()
+        df["enter_long"] = 0
+        pred_col = "&-prediction" if "&-prediction" in df.columns else ("&-pred_up_prob" if "&-pred_up_prob" in df.columns else None)
+        if pred_col is not None:
+            if pred_col == "&-prediction":
+                cond = df[pred_col] > df["close"] * 1.001
+            else:
+                cond = df[pred_col] > 0.55
+            if "do_predict" in df.columns:
+                cond = cond & (df["do_predict"] == 1)
+            df.loc[cond, "enter_long"] = 1
+        return df
+
+    def populate_exit_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
+        df = dataframe.copy()
+        df["exit_long"] = 0
+        pred_col = "&-prediction" if "&-prediction" in df.columns else ("&-pred_up_prob" if "&-pred_up_prob" in df.columns else None)
+        if pred_col is not None:
+            if pred_col == "&-prediction":
+                cond = df[pred_col] < df["close"] * 0.999
+            else:
+                cond = df[pred_col] < 0.45
+            if "do_predict" in df.columns:
+                cond = cond & (df["do_predict"] == 1)
+            df.loc[cond, "exit_long"] = 1
+        return df
