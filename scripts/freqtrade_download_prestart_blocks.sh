@@ -34,7 +34,8 @@ for i in $(seq 1 "${BLOCKS}"); do
   freqtrade download-data \
     --config "${CONFIG_PATH}" \
     -t ${TIMEFRAMES} \
-    --timerange "${start_date}-${end_date}"
+    --timerange "${start_date}-${end_date}" \
+    --prepend
   end_date_iso="${start_date_iso}"
 done
 
