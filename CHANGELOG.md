@@ -47,4 +47,5 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 ### Changed
 - `docker/Dockerfile.freqtrade.gpu.x86`: Bump Freqtrade to `2025.9` (with `freqai,plot` extras) and switch base image to Python 3.11 (`mosaicml/pytorch:2.3.1_cu121-python3.11-ubuntu20.04-aws`).
 - `docker-compose.yml`: Tag the FreqAI training service with an image name and reserve NVIDIA GPUs via `deploy.resources`.
+- `freqtrade_user_data/config.json`: Add `pair_whitelist`/`pair_blacklist` to satisfy StaticPairList requirements.
 - `hybrid_lstm_transformer_crypto.py`: Reworked `HybridTimeseriesFreqAIModel` to use official FreqAI fit/predict signatures, convert feature DataFrames into windows, and align predictions/DI output with FreqAI expectations.

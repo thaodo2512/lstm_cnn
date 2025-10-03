@@ -6,8 +6,10 @@
   "timeframe": "1h",
   "dry_run": true,
   "strategy": "FreqAIHybridExample",
+  "pair_whitelist": ["BTC/USDT"],
+  "pair_blacklist": [],
   "pairlists": [
-    { "method": "StaticPairList", "pairs": ["BTC/USDT"] }
+    { "method": "StaticPairList" }
   ],
   "exchange": {
     "name": "binance",
