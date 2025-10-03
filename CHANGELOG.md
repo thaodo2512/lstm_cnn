@@ -32,6 +32,13 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 ### Fixed
 - freqai(resolver): Make `freqtrade_user_data/freqaimodels/HybridTimeseriesFreqAIModel.py` define a local subclass of the core model so `__module__` matches the file, satisfying Freqtrade's resolver check and allowing the class to be discovered.
 
+## [0.1.11] - 2025-10-03
+### Chore
+- freqai(compose):
+  - Set `PYTHONWARNINGS=ignore::ImportWarning` to hide noisy SixMetaPathImporter warnings.
+  - Prepend `pip install -U six` in `freqai-train-gpu-l4` to upgrade `six` at runtime.
+  - Optionally install `stable-baselines3` and `sb3-contrib` (non-blocking) to suppress RL model import warnings.
+
 ## [0.1.2] - 2025-10-03
 ### Changed
 - `scripts/setup_nvidia_l4_cuda_docker_ubuntu.sh`: Switch installer to `INSTALL_MODE=binary` for LTS branch (535) and update notes.
