@@ -3,6 +3,7 @@ from __future__ import annotations
 from freqtrade.strategy.interface import IStrategy
 from pandas import DataFrame
 import pandas as pd
+import numpy as np
 
 try:
     from ta.momentum import RSIIndicator
