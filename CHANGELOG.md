@@ -7,6 +7,11 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 ## [0.1.2] - 2025-10-03
 ### Changed
 - `scripts/setup_nvidia_l4_cuda_docker_ubuntu.sh`: Switch installer to `INSTALL_MODE=binary` for LTS branch (535) and update notes.
+ - `freqtrade_user_data/config.json`: Conform FreqAI config to required keys (`model_classname`, `train_period_days`, `backtest_period_days`, `feature_parameters`, `data_split_parameters`, `purge_old_models`).
+ - `docker-compose.yml`: Pass `--freqaimodel HybridTimeseriesFreqAIModel` explicitly.
+
+### Added
+- `freqtrade_user_data/freqaimodels/HybridTimeseriesFreqAIModel.py`: Thin wrapper exposing our model class to FreqAI discovery.
 
 ## [0.1.1] - 2025-10-03
 ### Added
