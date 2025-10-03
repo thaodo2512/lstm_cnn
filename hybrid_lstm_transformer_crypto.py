@@ -1124,7 +1124,15 @@ class HybridTimeseriesFreqAIModel_tinhn(BasePyTorchRegressor):  # type: ignore
         with torch.no_grad(), torch.cuda.amp.autocast(enabled=(device.type == "cuda")):
             # Use the dataset/collate to keep behavior consistent with training
             ds = TimeSeriesWindowDataset(X_scaled, np.zeros((len(X_scaled), cfg.horizon), dtype=np.float32), variable_lengths=cfg.variable_lengths)
-            loader = torch.utils.data.DataLoader(ds, batch_size=max(1, cfg.batch_size), shuffle=False, num_workers=0, collate_fn=collate_with_padding)
+            loader = torch.utils.data.DataLoader(
+                ds,
+                batch_size=max(1, cfg.batch_size),
+                shuffle=False,
+                num_workers=cfg.num_workers,
+                collate_fn=collate_with_padding,
+                pin_memory=(device.type == "cuda"),
+                persistent_workers=(cfg.num_workers > 0 and device.type == "cuda"),
+            )
             for batch in loader:
                 x = batch["x"].to(device, non_blocking=True)
                 key_padding_mask = batch.get("key_padding_mask")

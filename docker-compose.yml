@@ -66,10 +66,10 @@ services:
       MPLBACKEND: Agg
       FREQAI_DEVICE: cuda
       PYTHONPATH: /workspace
-      TIMERANGE: ${TIMERANGE:-20240101-20250930}
+      TIMERANGE: ${TIMERANGE:-20240101-20240201}
       # Block download config
       TIMEFRAMES: ${TIMEFRAMES:-1h}
-      BLOCKS: ${BLOCKS:-3}
+      BLOCKS: ${BLOCKS:-1}
       BLOCK_DAYS: ${BLOCK_DAYS:-30}
     volumes:
       - ./:/workspace
@@ -123,6 +123,7 @@ services:
       PYTHONPATH: /workspace
       FREQAI_DEVICE: cuda
       MPLBACKEND: Agg
+      TIMERANGE: ${TIMERANGE:-20240101-20240201}
     volumes:
       - ./:/workspace
       - ./freqtrade_user_data:/freqtrade/user_data
@@ -132,7 +133,7 @@ services:
       "--config", "/freqtrade/user_data/config.json",
       "--freqaimodel", "HybridTimeseriesFreqAIModel_tinhn",
       "--strategy", "FreqAIHybridExample",
-      "--timerange", "${TIMERANGE:-20240101-20250930}"
+      "--timerange", "${TIMERANGE:-20240101-20240201}"
     ]
 
   # Freqtrade Web UI (FreqUI) to inspect results and interact with the bot

@@ -4,6 +4,21 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project adheres to Semantic Versioning.
 
+## [0.1.25] - 2025-10-03
+### Performance
+- perf(freqai): Add a fast GPU profile for backtesting/training.
+  - `freqtrade_user_data/config.json`:
+    - Increase `batch_size` to 128 and `num_workers` to 6; enable `compile_model` for `torch.compile` speedups.
+    - Reduce `epochs` to 10 with `early_stopping_patience=4` for quicker iterations.
+    - Shrink sequence and dataset: `window_size=48`, `stride=2`.
+    - Smaller model: `lstm_hidden=96`, `lstm_layers=1`, `d_model=96`, `nhead=2`, `ff_dim=256`.
+    - Trim indicator load: `indicator_periods_candles` to `[14]`.
+  - `docker-compose.yml`:
+    - Narrow default `TIMERANGE` to `20240101-20240201` for faster local cycles and reduce `BLOCKS` to `1`.
+    - Apply the same shortened `TIMERANGE` to `freqai-backtest-gpu-l4`.
+  - `hybrid_lstm_transformer_crypto.py`:
+    - Parallelize FreqAI inference DataLoader with `num_workers=cfg.num_workers`, enable CUDA `pin_memory` and `persistent_workers`.
+
 ## [0.1.4] - 2025-10-03
 ### Fixed
 - freqai(config): Move `pairlists` to top-level in `freqtrade_user_data/config.json` and keep `pair_whitelist`/`pair_blacklist` under `exchange` to satisfy Freqtrade schema and fix startup validation error.
