@@ -85,7 +85,7 @@ services:
     command:
       - bash
       - -lc
-      - >-
+      - |-
         set -ex;
         (pip install --no-cache-dir -U six && pip install --no-cache-dir stable-baselines3 sb3-contrib) || true;
         echo "TIMEFRAMES=${TIMEFRAMES:-1h} TIMERANGE=${TIMERANGE:-20240101-20250930} BLOCKS=${BLOCKS:-3} BLOCK_DAYS=${BLOCK_DAYS:-30}";
