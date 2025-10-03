@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from freqtrade.strategy import IStrategy
-from freqtrade.freqai.Freqai import IFreqaiInterface
+from freqtrade.strategy.interface import IStrategy
 from pandas import DataFrame
 import pandas as pd
 
@@ -12,7 +11,7 @@ except Exception:  # pragma: no cover - optional dependency
     RSIIndicator = EMAIndicator = ADXIndicator = None  # type: ignore
 
 
-class FreqAIHybridExample(IStrategy, IFreqaiInterface):
+class FreqAIHybridExample(IStrategy):
     """
     Strategy that consumes FreqAI predictions.
 
