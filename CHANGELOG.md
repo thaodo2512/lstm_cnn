@@ -8,7 +8,7 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 ### Performance
 - perf(freqai): Add a fast GPU profile for backtesting/training.
   - `freqtrade_user_data/config.json`:
-    - Increase `batch_size` to 128 and `num_workers` to 6; enable `compile_model` for `torch.compile` speedups.
+    - Increase `batch_size` to 128 and set `num_workers` to 4 (match typical 4 vCPU hosts); enable `compile_model` for `torch.compile` speedups.
     - Reduce `epochs` to 10 with `early_stopping_patience=4` for quicker iterations.
     - Shrink sequence and dataset: `window_size=48`, `stride=2`.
     - Smaller model: `lstm_hidden=96`, `lstm_layers=1`, `d_model=96`, `nhead=2`, `ff_dim=256`.

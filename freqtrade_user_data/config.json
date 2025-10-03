@@ -72,7 +72,7 @@
       "grad_clip": 1.0,
       "early_stopping_patience": 4,
       "use_minmax": false,
-      "num_workers": 6,
+      "num_workers": 4,
       "variable_lengths": false,
       "min_seq_len": 20,
       "pooling": "last",
