@@ -179,3 +179,4 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 - fix(freqai): Bump `freqai.identifier` to `BTC_fast` to avoid feature-list mismatch with previously trained models after feature changes (e.g., trimmed indicator periods). Prevents OperationalException during WebUI Pair History.
 ### Fixed
 - fix(config): Enable `trading_mode: futures` and `margin_mode: isolated` in `freqtrade_user_data/config.json` so WebUI backtests can run short strategies.
+- fix(exchange): Set `ccxt_config.options.defaultType=future` (and async) for Binance to ensure futures markets are loaded, preventing pairlist from removing futures pairs as "not tradable".

@@ -13,8 +13,8 @@
     "name": "binance",
     "key": "",
     "secret": "",
-    "ccxt_config": { "enableRateLimit": true },
-    "ccxt_async_config": { "enableRateLimit": true },
+    "ccxt_config": { "enableRateLimit": true, "options": { "defaultType": "future" } },
+    "ccxt_async_config": { "enableRateLimit": true, "options": { "defaultType": "future" } },
     "pair_whitelist": ["BTC/USDT"],
     "pair_blacklist": []
   },
