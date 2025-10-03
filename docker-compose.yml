@@ -67,7 +67,7 @@ services:
       FREQAI_DEVICE: cuda
       PYTHONPATH: /workspace
       TIMERANGE: ${TIMERANGE:-20240101-20250930}
-      # Simple recent-block download config
+      # Block download config
       TIMEFRAMES: ${TIMEFRAMES:-1h}
       BLOCKS: ${BLOCKS:-2}
       BLOCK_DAYS: ${BLOCK_DAYS:-30}
@@ -87,8 +87,11 @@ services:
       - -lc
       - >-
         (pip install --no-cache-dir -U six && pip install --no-cache-dir stable-baselines3 sb3-contrib) || true;
-        bash /workspace/scripts/freqtrade_download_recent_blocks.sh \
-          /freqtrade/user_data/config.json "${TIMEFRAMES:-1h}" "${BLOCKS:-2}" "${BLOCK_DAYS:-30}";
+        # Ensure backtest-range data exists
+        freqtrade download-data --config /freqtrade/user_data/config.json --timeframes "${TIMEFRAMES:-1h}" --timerange ${TIMERANGE:-20240101-20250930};
+        # Ensure pre-start history exists for FreqAI training windows
+        bash /workspace/scripts/freqtrade_download_prestart_blocks.sh \
+          /freqtrade/user_data/config.json "${TIMEFRAMES:-1h}" "${TIMERANGE:-20240101-20250930}" "${BLOCKS:-2}" "${BLOCK_DAYS:-30}";
         freqtrade backtesting --strategy FreqAIHybridExample --freqaimodel HybridTimeseriesFreqAIModel --config /freqtrade/user_data/config.json --timerange ${TIMERANGE:-20240101-20250930} --cache day
 
   # Alternate local run: direct backtesting with explicit strategy (same mounts)

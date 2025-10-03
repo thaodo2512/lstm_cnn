@@ -64,6 +64,12 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 ### Changed
 - freqai(compose): Switch to the recent-block script driven by `BLOCKS` and `BLOCK_DAYS` (defaults 2 and 30) to reduce configuration complexity.
 
+## [0.1.17] - 2025-10-03
+### Added
+- scripts: `scripts/freqtrade_download_prestart_blocks.sh` — downloads N×block_days ending at the backtest start (from `TIMERANGE`) to ensure FreqAI has pre-history for training.
+### Changed
+- freqai(compose): Always download the full `TIMERANGE` and then pre-start blocks based on `BLOCKS`/`BLOCK_DAYS` to guarantee coverage before training.
+
 ## [0.1.2] - 2025-10-03
 ### Changed
 - `scripts/setup_nvidia_l4_cuda_docker_ubuntu.sh`: Switch installer to `INSTALL_MODE=binary` for LTS branch (535) and update notes.
