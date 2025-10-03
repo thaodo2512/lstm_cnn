@@ -14,6 +14,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         git build-essential ca-certificates curl \
     && rm -rf /var/lib/apt/lists/*
 
+# Build and install TA-Lib C library (required by Python TA-Lib wrapper used by Freqtrade)
+RUN curl -L -o ta-lib-0.4.0-src.tar.gz http://prdownloads.sourceforge.net/ta-lib/ta-lib-0.4.0-src.tar.gz && \
+    tar -xzvf ta-lib-0.4.0-src.tar.gz && \
+    cd ta-lib/ && \
+    ./configure --prefix=/usr && \
+    make && \
+    make install && \
+    cd .. && \
+    rm -rf ta-lib ta-lib-0.4.0-src.tar.gz && \
+    ldconfig
+
 # Install Freqtrade with FreqAI extras (CPU/GPU - PyTorch CUDA provided by base image)
 RUN pip install --no-cache-dir \
         "freqtrade[freqai,plot]==2025.9" \
