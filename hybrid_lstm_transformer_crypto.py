@@ -285,6 +285,60 @@ def time_split_indices(n: int, train_frac: float = 0.8, val_frac: float = 0.1) -
     return idx[:train_end], idx[train_end:val_end], idx[val_end:]
 
 
+def build_windows_from_frames(
+    feature_df: pd.DataFrame,
+    label_df: pd.DataFrame,
+    window_size: int,
+    stride: int,
+    classification: bool,
+) -> Tuple[np.ndarray, np.ndarray, List[Any]]:
+    """Create sliding windows from feature/label dataframes delivered by FreqAI.
+
+    Returns X (N, T, F), y (N, label_dim) or (N,) for classification, and a list of
+    indices (typically timestamps) corresponding to the window end positions.
+    """
+
+    if len(feature_df) != len(label_df):
+        raise ValueError("Feature and label dataframes must share the same length")
+    if len(feature_df) < window_size:
+        raise ValueError("Not enough rows to create a single window")
+
+    # Align indices and drop NaNs jointly
+    combined = pd.concat([feature_df, label_df], axis=1, join="inner")
+    combined = combined.replace([np.inf, -np.inf], np.nan).dropna()
+    feature_cols = feature_df.columns
+    label_cols = label_df.columns
+    features = combined[feature_cols].astype(np.float32).to_numpy()
+    labels = combined[label_cols].to_numpy()
+    idx_list = combined.index.to_list()
+
+    max_start = len(combined) - window_size
+    X_list: List[np.ndarray] = []
+    y_list: List[Any] = []
+    end_indices: List[Any] = []
+
+    for start in range(0, max_start + 1, stride):
+        end = start + window_size
+        X_list.append(features[start:end])
+        target_row = labels[end - 1]
+        y_list.append(target_row)
+        end_indices.append(idx_list[end - 1])
+
+    X = np.stack(X_list, axis=0) if X_list else np.empty((0, window_size, features.shape[-1]), dtype=np.float32)
+    if classification:
+        cls_targets: List[int] = []
+        for v in y_list:
+            arr = np.atleast_1d(np.asarray(v))
+            cls_targets.append(int(arr[0]))
+        y = np.asarray(cls_targets, dtype=np.int64)
+    else:
+        y_array = np.asarray(y_list, dtype=np.float32)
+        if y_array.ndim == 1:
+            y_array = y_array[:, None]
+        y = y_array
+    return X, y, end_indices
+
+
 def fit_scalers(
     X_train: np.ndarray,
     y_train: np.ndarray,
@@ -769,26 +823,39 @@ def plot_attention_heatmap(attn: torch.Tensor, out_path: str) -> None:
 
 try:
     from freqtrade.freqai.base_models import BasePyTorchModel  # type: ignore
+    from freqtrade.freqai.data_kitchen import FreqaiDataKitchen  # type: ignore
 except Exception:
     class BasePyTorchModel:  # type: ignore
         """Fallback stub if freqtrade is not installed. Install with:
         pip install freqtrade
         """
+
         pass
+
+    FreqaiDataKitchen = Any  # type: ignore
 
 
 class HybridTimeseriesFreqAIModel(BasePyTorchModel):  # type: ignore
-    """Example FreqAI-compatible model wrapper.
+    """FreqAI-compatible wrapper around the hybrid LSTM+Transformer model.
 
-    Notes
-    - This is a simplified integration. Adjust to your FreqAI data_dictionary keys.
-    - Expects data_dictionary to contain time-ordered features and labels with sliding windows,
-      or raw sequences with parameters to build windows (see standalone usage).
+    The adapter converts FreqAI feature/label dataframes into sliding windows,
+    handles scaling, trains the PyTorch model, and returns predictions in the
+    format expected by FreqAI.
     """
 
-    def fit(self, data_dictionary: Dict[str, Any]) -> None:  # type: ignore[override]
-        params = data_dictionary.get("model_training_parameters", {})
-        cfg = TrainConfig(
+    def __init__(self, **kwargs: Any) -> None:  # type: ignore[override]
+        super().__init__(**kwargs)
+        self.cfg: Optional[TrainConfig] = None
+        self.model: Optional[HybridModel] = None
+        self.x_scaler: Optional[Any] = None
+        self.y_scaler: Optional[Any] = None
+        self.feature_columns: Optional[List[str]] = None
+        self.label_columns: Optional[List[str]] = None
+        self.device: Optional[torch.device] = None
+
+    def _resolve_config(self) -> TrainConfig:
+        params = self.freqai_info.get("model_training_parameters", {}) if hasattr(self, "freqai_info") else {}
+        return TrainConfig(
             window_size=int(params.get("window_size", 60)),
             horizon=int(params.get("horizon", 1)),
             stride=int(params.get("stride", 1)),
@@ -815,23 +882,77 @@ class HybridTimeseriesFreqAIModel(BasePyTorchModel):  # type: ignore
             transformer_dropout=float(params.get("transformer_dropout", 0.1)),
             compile_model=bool(params.get("compile_model", False)),
         )
-        X_train = data_dictionary.get("X_train")
-        y_train = data_dictionary.get("y_train")
-        X_val = data_dictionary.get("X_val")
-        y_val = data_dictionary.get("y_val")
-        if X_train is None or y_train is None or X_val is None or y_val is None:
-            raise ValueError("FreqAI data_dictionary missing X_train, y_train, X_val, y_val")
 
-        device = get_device()
-        x_scaler, y_scaler = fit_scalers(X_train, y_train, use_minmax=cfg.use_minmax, classification=cfg.classification)
+    @staticmethod
+    def _ensure_dataframe(obj: Any) -> pd.DataFrame:
+        if isinstance(obj, pd.DataFrame):
+            return obj
+        if isinstance(obj, np.ndarray):
+            return pd.DataFrame(obj)
+        raise TypeError("Expected pandas DataFrame or numpy array for FreqAI data inputs")
+
+    def fit(self, data_dictionary: Dict[str, Any], dk: FreqaiDataKitchen, **kwargs: Any) -> Any:  # type: ignore[override]
+        cfg = self._resolve_config()
+        self.cfg = cfg
+
+        train_features = self._ensure_dataframe(data_dictionary.get("train_features"))
+        train_labels = self._ensure_dataframe(data_dictionary.get("train_labels"))
+        val_features = data_dictionary.get("val_features")
+        val_labels = data_dictionary.get("val_labels")
+
+        if val_features is None or val_labels is None:
+            split_point = int(len(train_features) * 0.8)
+            val_features = train_features.iloc[split_point:].copy()
+            val_labels = train_labels.iloc[split_point:].copy()
+            train_features = train_features.iloc[:split_point].copy()
+            train_labels = train_labels.iloc[:split_point].copy()
+        else:
+            val_features = self._ensure_dataframe(val_features)
+            val_labels = self._ensure_dataframe(val_labels)
+
+        self.feature_columns = train_features.columns.tolist()
+        label_columns = train_labels.columns.tolist()
+        self.label_columns = label_columns
+
+        X_train, y_train, _ = build_windows_from_frames(
+            train_features,
+            train_labels,
+            window_size=cfg.window_size,
+            stride=cfg.stride,
+            classification=cfg.classification,
+        )
+        X_val, y_val, _ = build_windows_from_frames(
+            val_features,
+            val_labels,
+            window_size=cfg.window_size,
+            stride=cfg.stride,
+            classification=cfg.classification,
+        )
+
+        if len(X_train) == 0 or len(X_val) == 0:
+            raise ValueError("Insufficient data to build training/validation windows for FreqAI model.")
+
+        dummy_y = y_train if not cfg.classification else np.zeros((len(X_train), cfg.horizon), dtype=np.float32)
+        x_scaler, y_scaler = fit_scalers(X_train, dummy_y, use_minmax=cfg.use_minmax, classification=cfg.classification)
         X_train_s, y_train_s = apply_scalers(X_train, y_train, x_scaler, y_scaler, cfg.classification)
         X_val_s, y_val_s = apply_scalers(X_val, y_val, x_scaler, y_scaler, cfg.classification)
 
-        ds_tr = TimeSeriesWindowDataset(X_train_s, y_train_s, variable_lengths=cfg.variable_lengths, min_seq_len=cfg.min_seq_len)
+        dataset_kwargs = dict(variable_lengths=cfg.variable_lengths, min_seq_len=cfg.min_seq_len)
+        ds_tr = TimeSeriesWindowDataset(X_train_s, y_train_s, **dataset_kwargs)
         ds_val = TimeSeriesWindowDataset(X_val_s, y_val_s, variable_lengths=False)
-        loader_kwargs = dict(batch_size=cfg.batch_size, shuffle=True, num_workers=cfg.num_workers, collate_fn=collate_with_padding)
+
+        device = get_device()
+        self.device = device
+
+        loader_kwargs = dict(
+            batch_size=cfg.batch_size,
+            shuffle=True,
+            num_workers=cfg.num_workers,
+            collate_fn=collate_with_padding,
+        )
         if device.type == "cuda":
             loader_kwargs.update(dict(pin_memory=True, persistent_workers=(cfg.num_workers > 0)))
+
         train_loader = torch.utils.data.DataLoader(ds_tr, **loader_kwargs)
         val_loader = torch.utils.data.DataLoader(ds_val, **{**loader_kwargs, "shuffle": False})
 
@@ -851,30 +972,80 @@ class HybridTimeseriesFreqAIModel(BasePyTorchModel):  # type: ignore
             classification=cfg.classification,
             capture_attention=cfg.capture_attention,
         )
+
         trainer = Trainer(model, device, cfg, classification=cfg.classification)
         trainer.train_epochs(train_loader, val_loader, cfg.epochs)
+
         self.model = model
         self.x_scaler = x_scaler
-        self.y_scaler = y_scaler
+        self.y_scaler = y_scaler if not cfg.classification else None
 
-    def predict(self, data_dictionary: Dict[str, Any]) -> Tuple[pd.DataFrame, Dict[str, Any]]:  # type: ignore[override]
-        model: HybridModel = getattr(self, "model")
-        x_scaler = getattr(self, "x_scaler")
-        y_scaler = getattr(self, "y_scaler", None)
-        X = data_dictionary.get("X_test")
-        if X is None:
-            raise ValueError("FreqAI data_dictionary missing X_test")
-        device = get_device()
-        preds = predict(model, device, X, x_scaler, y_scaler, batch_size=64)
-        if model.classification:
-            probs = torch.softmax(torch.from_numpy(preds), dim=-1).numpy()
-            up_prob = probs[:, 1]
-            pred_df = pd.DataFrame({"pred_up_prob": up_prob})
+        # Persist references for saving/restoring via FreqAI
+        self.freqai_trainer = trainer  # type: ignore[attr-defined]
+        self.dk = dk
+        return trainer
+
+    def _prepare_inference_windows(self, feature_df: pd.DataFrame) -> Tuple[np.ndarray, List[Any]]:
+        assert self.cfg is not None
+        cfg = self.cfg
+        if self.feature_columns is not None:
+            feature_df = feature_df[self.feature_columns]
+        feature_df = feature_df.replace([np.inf, -np.inf], np.nan).dropna()
+        feature_df = feature_df.sort_index()
+        if feature_df.shape[1] == 0:
+            raise ValueError("Feature dataframe is empty; cannot prepare inference window.")
+        if len(feature_df) < cfg.window_size:
+            raise ValueError("Not enough rows to create inference window. Increase history or reduce window_size.")
+
+        placeholder_labels = pd.DataFrame(
+            {"__placeholder_label__": feature_df.iloc[:, 0].to_numpy()},
+            index=feature_df.index,
+        )
+        X, _, indices = build_windows_from_frames(
+            feature_df,
+            placeholder_labels,
+            window_size=cfg.window_size,
+            stride=1,
+            classification=False,
+        )
+        return X[-1:], indices[-1:]
+
+    def predict(self, unfiltered_df: pd.DataFrame, dk: FreqaiDataKitchen, **kwargs: Any) -> Tuple[pd.DataFrame, np.ndarray]:  # type: ignore[override]
+        if self.model is None or self.x_scaler is None or self.cfg is None:
+            raise RuntimeError("Model has not been fitted before predict call.")
+
+        feature_df = dk.make_test_data_point(unfiltered_df)
+        X_windows, indices = self._prepare_inference_windows(feature_df)
+
+        cfg = self.cfg
+        model = self.model
+        device = self.device or get_device()
+
+        # Scale features
+        dummy_y = np.zeros((len(X_windows), cfg.horizon), dtype=np.float32)
+        X_scaled, _ = apply_scalers(X_windows, dummy_y, self.x_scaler, self.y_scaler, cfg.classification)
+
+        model.eval()
+        with torch.no_grad(), torch.cuda.amp.autocast(enabled=(device.type == "cuda")):
+            x_tensor = torch.from_numpy(X_scaled).to(device)
+            preds, _ = model(x_tensor)
+            preds_np = preds.detach().cpu().numpy()
+
+        index = pd.Index(indices, name=feature_df.index.name)
+        if cfg.classification:
+            probs = torch.softmax(torch.from_numpy(preds_np), dim=-1).numpy()
+            prob_up = probs[:, 1]
+            column_name = self.label_columns[0] if self.label_columns else "&-pred_up_prob"
+            pred_df = pd.DataFrame({column_name: prob_up}, index=index)
         else:
-            # Return only t+1 horizon for FreqAI if h>1
-            col = preds[:, 0] if preds.ndim == 2 else preds
-            pred_df = pd.DataFrame({"prediction": col})
-        return pred_df, {"DI_values": {}}
+            if self.y_scaler is not None:
+                preds_np = self.y_scaler.inverse_transform(preds_np)
+            columns = self.label_columns or ["&-prediction"]
+            pred_df = pd.DataFrame(preds_np, columns=columns, index=index)
+
+        # DI (distance / dissimilarity index) -> ones (no outliers removed)
+        di_values = np.ones(len(pred_df), dtype=np.float32)
+        return pred_df, di_values
 
 
 FREQAI_CONFIG_SNIPPET = """
@@ -1175,4 +1346,3 @@ if __name__ == "__main__":
         print(f"ERROR: {e}")
         print("If missing optional deps, install with: pip install ccxt yfinance pandas_datareader")
         sys.exit(1)
-
