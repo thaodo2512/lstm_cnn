@@ -160,3 +160,4 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 - `hybrid_lstm_transformer_crypto.py`: Reworked `HybridTimeseriesFreqAIModel` to use official FreqAI fit/predict signatures, convert feature DataFrames into windows, and align predictions/DI output with FreqAI expectations.
 ### Fixed
 - fix(webui): Remove unsupported `--freqaimodel` from `webserver` command and set top-level `freqaimodel` in `freqtrade_user_data/config.json` so WebUI can load the FreqAI model during `pair_history` without CLI args.
+- fix(freqai): Bump `freqai.identifier` to `BTC_fast` to avoid feature-list mismatch with previously trained models after feature changes (e.g., trimmed indicator periods). Prevents OperationalException during WebUI Pair History.
