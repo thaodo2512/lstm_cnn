@@ -176,6 +176,36 @@ services:
         echo "Running backtest for pairs: ${PAIRS}"
         bash /workspace/scripts/run_backtest_pairs.sh
 
+  # Live/dry-run signal bot with Telegram notifications (uses Telegram in config)
+  freqai-signal-bot-gpu-l4:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.freqtrade.gpu.x86
+    container_name: freqai_signal_bot_gpu_l4
+    gpus: all
+    restart: unless-stopped
+    shm_size: "2g"
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+      PYTHONPATH: /workspace
+      FREQAI_DEVICE: cuda
+      MPLBACKEND: Agg
+      PAIRS: ${PAIRS:-BTC/USDT:USDT}
+      STRATEGY: ${STRATEGY:-FreqAIHybridExample}
+      FREQAIMODEL: ${FREQAIMODEL:-HybridTimeseriesFreqAIModel_tinhn}
+    volumes:
+      - ./:/workspace
+      - ./freqtrade_user_data:/freqtrade/user_data
+    working_dir: /freqtrade
+    command:
+      - bash
+      - -lc
+      - |-
+        set -euo pipefail
+        echo "Starting signal bot for pairs: ${PAIRS}"
+        bash /workspace/scripts/run_trade_pairs.sh
+
   # Freqtrade Web UI (FreqUI) to inspect results and interact with the bot
   freqtrade-webui:
     build:

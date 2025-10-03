@@ -25,6 +25,12 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 - feat(compose): Add `freqai-backtest-pairs-gpu-l4` service to backtest arbitrary pairs via env `PAIRS` (comma-separated). Uses a temporary config so your main config stays intact.
 - feat(scripts): `scripts/run_backtest_pairs.sh` — builds a temp whitelist, downloads data, ensures prehistory blocks, and runs backtesting with FreqAI model and GPU.
 
+## [0.1.29] - 2025-10-04
+### Added
+- feat(bot): `freqai-signal-bot-gpu-l4` service to run `freqtrade trade` in dry-run for the selected pairs and send Telegram notifications for trades (signals). Set `PAIRS`, `STRATEGY`, `FREQAIMODEL` as envs, and enable Telegram in config.
+- feat(scripts): `scripts/run_trade_pairs.sh` — temp-config wrapper to run the bot with a custom whitelist without altering the main config.
+- config: Add `telegram` section placeholders (disabled by default). Fill `token` and `chat_id`, then set `enabled: true` to receive messages.
+
 ## [0.1.25] - 2025-10-03
 ### Performance
 - perf(freqai): Add a fast GPU profile for backtesting/training.

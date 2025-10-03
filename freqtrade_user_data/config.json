@@ -550,6 +550,11 @@
     "username": "admin",
     "password": "changeme"
   },
+  "telegram": {
+    "enabled": false,
+    "token": "",
+    "chat_id": ""
+  },
   "entry_pricing": {
     "price_side": "same",
     "use_order_book": true,
