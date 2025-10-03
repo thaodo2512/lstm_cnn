@@ -157,8 +157,13 @@ services:
       TIMERANGE: ${TIMERANGE:-20240101-20240201}
       STRATEGY: ${STRATEGY:-FreqAIHybridExample}
       FREQAIMODEL: ${FREQAIMODEL:-HybridTimeseriesFreqAIModel_tinhn}
+      EXPORT_TYPE: ${EXPORT_TYPE:-trades}
       BLOCKS: ${BLOCKS:-1}
       BLOCK_DAYS: ${BLOCK_DAYS:-30}
+      # Optional Telegram notify
+      NOTIFY_TELEGRAM: ${NOTIFY_TELEGRAM:-false}
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
     volumes:
       - ./:/workspace
       - ./freqtrade_user_data:/freqtrade/user_data

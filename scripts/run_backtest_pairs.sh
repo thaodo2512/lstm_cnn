@@ -9,6 +9,7 @@ TIMERANGE=${TIMERANGE:-20240101-20240201}
 TIMEFRAMES=${TIMEFRAMES:-1h}
 STRATEGY=${STRATEGY:-FreqAIHybridExample}
 FREQAIMODEL=${FREQAIMODEL:-HybridTimeseriesFreqAIModel_tinhn}
+EXPORT_TYPE=${EXPORT_TYPE:-trades}   # trades|signals
 CONFIG_IN=${CONFIG_IN:-/freqtrade/user_data/config.json}
 CONFIG_TMP=${CONFIG_TMP:-/tmp/config_pairs.json}
 BLOCKS=${BLOCKS:-1}
@@ -45,14 +46,25 @@ bash /workspace/scripts/freqtrade_download_prestart_blocks.sh "$CONFIG_TMP" "$TI
 
 echo "Running backtest..."
 mkdir -p /freqtrade/user_data/backtest_results
+EXPORT_PATH=/freqtrade/user_data/backtest_results/freqai_${EXPORT_TYPE}.json
 freqtrade backtesting \
   --config "$CONFIG_TMP" \
   --strategy "$STRATEGY" \
   --freqaimodel "$FREQAIMODEL" \
   --timerange "$TIMERANGE" \
   --cache day \
-  --export trades \
-  --export-filename /freqtrade/user_data/backtest_results/freqai_trades.json
+  --export "$EXPORT_TYPE" \
+  --export-filename "$EXPORT_PATH"
 
-echo "Backtest finished. Results: /freqtrade/user_data/backtest_results/freqai_trades.json"
+echo "Backtest finished. Results: $EXPORT_PATH"
 
+# Optional Telegram notification
+if [[ "${NOTIFY_TELEGRAM:-false}" == "true" ]] && [[ -n "${TELEGRAM_BOT_TOKEN:-}" ]] && [[ -n "${TELEGRAM_CHAT_ID:-}" ]]; then
+  echo "Sending Telegram notification..."
+  python /workspace/scripts/notify_telegram.py \
+    --file "$EXPORT_PATH" \
+    --pairs "$PAIRS_CSV" \
+    --timerange "$TIMERANGE" \
+    --timeframes "$TIMEFRAMES" \
+    --export-type "$EXPORT_TYPE"
+fi
