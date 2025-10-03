@@ -840,7 +840,7 @@ except Exception:
     FreqaiDataKitchen = Any  # type: ignore
 
 
-class HybridTimeseriesFreqAIModel(BasePyTorchRegressor):  # type: ignore
+class HybridTimeseriesFreqAIModel_tinhn(BasePyTorchRegressor):  # type: ignore
     """FreqAI-compatible wrapper around the hybrid LSTM+Transformer model.
 
     The adapter converts FreqAI feature/label dataframes into sliding windows,

@@ -16,7 +16,7 @@
 - Docker (GPU, L4):
   - `docker compose up --build crypto-train-gpu-l4`
 - FreqAI via Freqtrade (GPU):
-  - Ensure `../user_data/config.json` points to `module_path: "hybrid_lstm_transformer_crypto"`, `class_name: "HybridTimeseriesFreqAIModel"`.
+  - Ensure `../user_data/config.json` points to `module_path: "hybrid_lstm_transformer_crypto"`, `class_name: "HybridTimeseriesFreqAIModel_tinhn"`.
   - `docker compose up --build freqai-train-gpu-l4`
 
 ## Coding Style & Naming Conventions

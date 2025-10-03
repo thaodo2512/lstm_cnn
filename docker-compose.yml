@@ -101,7 +101,7 @@ services:
         mkdir -p /freqtrade/user_data/backtest_results;
         freqtrade backtesting \
           --strategy FreqAIHybridExample \
-          --freqaimodel HybridTimeseriesFreqAIModel \
+          --freqaimodel HybridTimeseriesFreqAIModel_tinhn \
           --config /freqtrade/user_data/config.json \
           --timerange "${TIMERANGE:-20240101-20250930}" \
           --cache day \
@@ -130,7 +130,7 @@ services:
     command: [
       "freqtrade", "backtesting",
       "--config", "/freqtrade/user_data/config.json",
-      "--freqaimodel", "HybridTimeseriesFreqAIModel",
+      "--freqaimodel", "HybridTimeseriesFreqAIModel_tinhn",
       "--strategy", "FreqAIHybridExample",
       "--timerange", "${TIMERANGE:-20240101-20250930}"
     ]

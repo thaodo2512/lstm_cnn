@@ -16,7 +16,7 @@ class FreqAIHybridExample(IStrategy):
     Strategy that consumes FreqAI predictions.
 
     FreqAI injects columns like '&-prediction' (regression) and 'do_predict'.
-    Ensure your config uses model_classname: "HybridTimeseriesFreqAIModel".
+    Ensure your config uses model_classname: "HybridTimeseriesFreqAIModel_tinhn".
     """
 
     timeframe = "1h"

@@ -94,6 +94,10 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 ### Fixed
 - strategy(freqai): Guard ADX/RSI/EMA feature generation for short slices in `FreqAIHybridExample.feature_engineering_expand_all` to avoid `ValueError: negative dimensions are not allowed` when the UI requests small data windows (e.g., charts). ADX now returns NaN for insufficient length; other indicators fall back safely.
 
+## [0.1.24] - 2025-10-03
+### Changed
+- freqai(model): Rename class to `HybridTimeseriesFreqAIModel_tinhn` and add a discovery wrapper at `freqtrade_user_data/freqaimodels/HybridTimeseriesFreqAIModel_tinhn.py`. Updated config (`freqai.model_classname`) and compose `--freqaimodel` flags accordingly. Kept backward-compatible alias in the legacy wrapper.
+
 ## [0.1.2] - 2025-10-03
 ### Changed
 - `scripts/setup_nvidia_l4_cuda_docker_ubuntu.sh`: Switch installer to `INSTALL_MODE=binary` for LTS branch (535) and update notes.
