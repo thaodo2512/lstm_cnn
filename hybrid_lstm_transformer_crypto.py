@@ -1022,41 +1022,140 @@ class HybridTimeseriesFreqAIModel(BasePyTorchRegressor):  # type: ignore
         return X[-1:], indices[-1:]
 
     def predict(self, unfiltered_df: pd.DataFrame, dk: FreqaiDataKitchen, **kwargs: Any) -> Tuple[pd.DataFrame, np.ndarray]:  # type: ignore[override]
+        """Predict over a full backtest/live slice using DK pipelines.
+
+        - Uses DataKitchen to select the trained feature set and compute do_predict/DI masks.
+        - Creates sliding windows across the full slice and aligns predictions to the
+          original dataframe length (leading positions without a full window are zero).
+        - Returns a DataFrame with the same number of rows as ``unfiltered_df`` and a
+          numpy array for ``do_predict`` compatible with FreqAI expectations.
+        """
         if self.model is None or self.x_scaler is None or self.cfg is None:
             raise RuntimeError("Model has not been fitted before predict call.")
-
-        feature_df = dk.make_test_data_point(unfiltered_df)
-        X_windows, indices = self._prepare_inference_windows(feature_df)
 
         cfg = self.cfg
         model = self.model
         device = self.device or get_device()
 
-        # Scale features
+        # 1) Build feature dataframe via DK (ensures same feature list as training)
+        try:
+            dk.find_features(unfiltered_df)
+        except Exception:
+            # If already set from training, proceed
+            pass
+
+        filtered_df, _ = dk.filter_features(
+            unfiltered_df, dk.training_features_list, training_filter=False
+        )
+        dk.data_dictionary["prediction_features"] = filtered_df.copy()
+
+        # 2) Apply DK feature pipeline to compute outliers/DI (keeps row count)
+        outliers: np.ndarray
+        di_values: np.ndarray
+        try:
+            pred_feats, outliers, _ = dk.feature_pipeline.transform(
+                dk.data_dictionary["prediction_features"], outlier_check=True
+            )
+            dk.data_dictionary["prediction_features"] = pred_feats
+            if getattr(dk.feature_pipeline, "__getitem__", None) and dk.feature_pipeline["di"]:
+                di_values = dk.feature_pipeline["di"].di_values
+            else:
+                di_values = np.zeros(len(pred_feats), dtype=np.float32)
+        except Exception:
+            # Fallback: if pipeline unavailable, keep raw features and mark all as predictible
+            pred_feats = dk.data_dictionary["prediction_features"].copy()
+            outliers = np.ones(len(pred_feats), dtype=np.int_)
+            di_values = np.zeros(len(pred_feats), dtype=np.float32)
+
+        dk.do_predict = outliers
+        dk.DI_values = di_values
+
+        # 3) Window the full slice and run the model in batches
+        feature_df = pred_feats
+        total_len = len(feature_df)
+
+        if total_len < cfg.window_size:
+            # Not enough data to form a single window -> return zeros matching length
+            if cfg.classification:
+                column_name = self.label_columns[0] if self.label_columns else "&-pred_up_prob"
+                pred_df = pd.DataFrame({column_name: np.zeros(total_len, dtype=np.float32)}, index=feature_df.index)
+            else:
+                columns = self.label_columns or ["&-prediction"]
+                pred_df = pd.DataFrame(np.zeros((total_len, len(columns)), dtype=np.float32), columns=columns, index=feature_df.index)
+            return pred_df, dk.do_predict
+
+        # Placeholder labels just to reuse the window builder and keep indices
+        placeholder_labels = pd.DataFrame(
+            {"__placeholder_label__": np.zeros(total_len, dtype=np.float32)},
+            index=feature_df.index,
+        )
+        X_windows, _, end_indices = build_windows_from_frames(
+            feature_df,
+            placeholder_labels,
+            window_size=cfg.window_size,
+            stride=1,
+            classification=False,
+        )
+
+        # Scale & forward pass (batch inference)
         dummy_y = np.zeros((len(X_windows), cfg.horizon), dtype=np.float32)
         X_scaled, _ = apply_scalers(X_windows, dummy_y, self.x_scaler, self.y_scaler, cfg.classification)
 
         model.eval()
+        preds_list: List[np.ndarray] = []
         with torch.no_grad(), torch.cuda.amp.autocast(enabled=(device.type == "cuda")):
-            x_tensor = torch.from_numpy(X_scaled).to(device)
-            preds, _ = model(x_tensor)
-            preds_np = preds.detach().cpu().numpy()
+            # Use the dataset/collate to keep behavior consistent with training
+            ds = TimeSeriesWindowDataset(X_scaled, np.zeros((len(X_scaled), cfg.horizon), dtype=np.float32), variable_lengths=cfg.variable_lengths)
+            loader = torch.utils.data.DataLoader(ds, batch_size=max(1, cfg.batch_size), shuffle=False, num_workers=0, collate_fn=collate_with_padding)
+            for batch in loader:
+                x = batch["x"].to(device, non_blocking=True)
+                key_padding_mask = batch.get("key_padding_mask")
+                if key_padding_mask is not None:
+                    key_padding_mask = key_padding_mask.to(device, non_blocking=True)
+                y_hat, _ = model(x, key_padding_mask=key_padding_mask)
+                preds_list.append(y_hat.detach().cpu().numpy())
+        preds_np = np.concatenate(preds_list, axis=0) if preds_list else np.zeros((0, cfg.horizon), dtype=np.float32)
 
-        index = pd.Index(indices, name=feature_df.index.name)
+        # 4) Align predictions back to full length (leading rows get 0)
         if cfg.classification:
-            probs = torch.softmax(torch.from_numpy(preds_np), dim=-1).numpy()
-            prob_up = probs[:, 1]
+            probs = torch.softmax(torch.from_numpy(preds_np), dim=-1).numpy() if len(preds_np) else np.zeros((0, 2), dtype=np.float32)
+            prob_up = probs[:, 1] if probs.shape[-1] > 1 else np.zeros(len(probs), dtype=np.float32)
             column_name = self.label_columns[0] if self.label_columns else "&-pred_up_prob"
-            pred_df = pd.DataFrame({column_name: prob_up}, index=index)
+            full_vals = np.zeros(total_len, dtype=np.float32)
+            # end_indices reference the last index for each window
+            if len(end_indices) > 0:
+                full_indexer = pd.Index(end_indices)
+                # Map predictions to their corresponding positions
+                pd.Series(prob_up, index=full_indexer).reindex(feature_df.index, fill_value=0.0)
+                full_series = pd.Series(full_vals, index=feature_df.index)
+                full_series.loc[full_indexer] = prob_up
+                pred_df = pd.DataFrame({column_name: full_series.values}, index=feature_df.index)
+            else:
+                pred_df = pd.DataFrame({column_name: full_vals}, index=feature_df.index)
+            return pred_df, dk.do_predict
         else:
-            if self.y_scaler is not None:
+            # Inverse model-specific scaler first (second stage)
+            if self.y_scaler is not None and len(preds_np) > 0:
                 preds_np = self.y_scaler.inverse_transform(preds_np)
-            columns = self.label_columns or ["&-prediction"]
-            pred_df = pd.DataFrame(preds_np, columns=columns, index=index)
 
-        # DI (distance / dissimilarity index) -> ones (no outliers removed)
-        di_values = np.ones(len(pred_df), dtype=np.float32)
-        return pred_df, di_values
+            columns = self.label_columns or ["&-prediction"]
+            full_preds = np.zeros((total_len, len(columns)), dtype=np.float32)
+            if len(end_indices) > 0 and len(preds_np) > 0:
+                # Place window-end predictions at their positions
+                idx_pos = pd.Index(feature_df.index)
+                end_pos = idx_pos.get_indexer(end_indices)
+                valid = end_pos >= 0
+                full_preds[end_pos[valid]] = preds_np[: np.count_nonzero(valid)]
+            pred_df = pd.DataFrame(full_preds, columns=columns, index=feature_df.index)
+
+            # Then inverse the DK label pipeline to get back to original label scale if present
+            try:
+                pred_df, _, _ = dk.label_pipeline.inverse_transform(pred_df)
+            except Exception:
+                # If label pipeline not available, keep current scale
+                pass
+
+            return pred_df, dk.do_predict
 
 
 FREQAI_CONFIG_SNIPPET = """

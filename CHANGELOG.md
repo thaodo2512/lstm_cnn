@@ -74,6 +74,10 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 ### Fixed
 - scripts: Robust date math for block downloaders — convert YYYYMMDD to ISO (YYYY-MM-DD) before `date -d` operations to ensure correct ranges on Ubuntu base images.
 
+## [0.1.19] - 2025-10-03
+### Fixed
+- freqai(model): Replace call to removed `dk.make_test_data_point` with supported `dk.filter_features(..., training_filter=False)` and `dk.feature_pipeline.transform(..., outlier_check=True)` in `HybridTimeseriesFreqAIModel.predict()`. Build sliding windows across the backtest slice, batch-infer, align predictions back to full length, and return `do_predict`/`DI_values` from the pipeline. Fixes `AttributeError: 'FreqaiDataKitchen' object has no attribute 'make_test_data_point'` during backtesting.
+
 ## [0.1.2] - 2025-10-03
 ### Changed
 - `scripts/setup_nvidia_l4_cuda_docker_ubuntu.sh`: Switch installer to `INSTALL_MODE=binary` for LTS branch (535) and update notes.
