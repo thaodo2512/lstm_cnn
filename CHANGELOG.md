@@ -45,4 +45,4 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 
 ## [0.1.3] - 2025-10-03
 ### Changed
-- `docker/Dockerfile.freqtrade.gpu.x86`: Bump Freqtrade to `2025.9` (with `freqai,plot` extras).
+- `docker/Dockerfile.freqtrade.gpu.x86`: Bump Freqtrade to `2025.9` (with `freqai,plot` extras) and switch base image to Python 3.11 (`cnstark/pytorch:2.3.1-cu121-py3.11-ubuntu20.04`).
