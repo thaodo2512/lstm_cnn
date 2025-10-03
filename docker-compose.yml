@@ -43,11 +43,18 @@ services:
 
   # FreqAI training service (uses our HybridTimeseriesFreqAIModel via PYTHONPATH)
   freqai-train-gpu-l4:
+    image: your-built-image  # replace with the tag produced by `docker compose build`
     build:
       context: .
       dockerfile: docker/Dockerfile.freqtrade.gpu.x86
     container_name: freqai_train_gpu_l4
-    gpus: all
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     restart: unless-stopped
     shm_size: "2g"
     environment:
