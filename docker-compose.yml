@@ -78,13 +78,13 @@ services:
       - ../scripts:/freqtrade/scripts
     working_dir: /freqtrade
     # Backtesting triggers FreqAI training + inference
-    command: >
-      bash -lc "
-      pip install --no-cache-dir -U six && \
-      # Optional: install RL deps to silence resolver warnings (non-blocking)
-      pip install --no-cache-dir stable-baselines3 sb3-contrib || true && \
-      freqtrade download-data --config /freqtrade/user_data/config.json --timeframes 1h --timerange ${TIMERANGE:-20240101-20250930} && \
-      freqtrade backtesting --strategy FreqAIHybridExample --freqaimodel HybridTimeseriesFreqAIModel --config /freqtrade/user_data/config.json --timerange ${TIMERANGE:-20240101-20250930} --cache day"
+    command:
+      - bash
+      - -lc
+      - >-
+        (pip install --no-cache-dir -U six && pip install --no-cache-dir stable-baselines3 sb3-contrib) || true;
+        freqtrade download-data --config /freqtrade/user_data/config.json --timeframes 1h --timerange ${TIMERANGE:-20240101-20250930};
+        freqtrade backtesting --strategy FreqAIHybridExample --freqaimodel HybridTimeseriesFreqAIModel --config /freqtrade/user_data/config.json --timerange ${TIMERANGE:-20240101-20250930} --cache day
 
   # Alternate local run: direct backtesting with explicit strategy (same mounts)
   freqai-backtest-gpu-l4:
