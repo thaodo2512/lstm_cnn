@@ -8,6 +8,10 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 ### Fixed
 - freqai(config): Move `pairlists` to top-level in `freqtrade_user_data/config.json` and keep `pair_whitelist`/`pair_blacklist` under `exchange` to satisfy Freqtrade schema and fix startup validation error.
 
+## [0.1.5] - 2025-10-03
+### Fixed
+- freqai(config): Add mandatory `entry_pricing` and `exit_pricing` sections to `freqtrade_user_data/config.json` to satisfy stricter schema/validation and prevent KeyError on startup.
+
 ## [0.1.2] - 2025-10-03
 ### Changed
 - `scripts/setup_nvidia_l4_cuda_docker_ubuntu.sh`: Switch installer to `INSTALL_MODE=binary` for LTS branch (535) and update notes.
