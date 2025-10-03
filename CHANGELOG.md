@@ -52,6 +52,12 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 - freqai(strategy): Simplify target to `shift(-label_period)` (remove rolling mean) to reduce label NaNs during training.
 - freqai(compose): Download a wider data range via `DOWNLOAD_TIMERANGE` (defaults to start a year earlier) to ensure enough pre-backtest history for FreqAI training windows.
 
+## [0.1.15] - 2025-10-03
+### Added
+- scripts: `scripts/freqtrade_download_blocks.sh` to download OHLCV in fixed-size blocks (default 30 days).
+### Changed
+- freqai(compose): Use block-based download by calling the new script with env-configurable `TIMEFRAMES`, `DOWNLOAD_START`, `DOWNLOAD_END`, and `BLOCK_DAYS` (default 30).
+
 ## [0.1.2] - 2025-10-03
 ### Changed
 - `scripts/setup_nvidia_l4_cuda_docker_ubuntu.sh`: Switch installer to `INSTALL_MODE=binary` for LTS branch (535) and update notes.
