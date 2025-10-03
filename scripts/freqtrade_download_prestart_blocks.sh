@@ -24,7 +24,7 @@ ymd_to_iso() { echo "${1:0:4}-${1:4:2}-${1:6:2}"; }
 iso_to_ymd() { echo "${1//-/}"; }
 
 end_date_iso="$(ymd_to_iso "${START_DATE}")"
-echo "Downloading ${BLOCKS} pre-start blocks of ${BLOCK_DAYS} days ending at ${end_date} for ${TIMEFRAMES}" >&2
+echo "Downloading ${BLOCKS} pre-start blocks of ${BLOCK_DAYS} days ending at ${START_DATE} for ${TIMEFRAMES}" >&2
 
 for i in $(seq 1 "${BLOCKS}"); do
   start_date_iso=$(date -u -d "${end_date_iso} - ${BLOCK_DAYS} days" +%Y-%m-%d)
@@ -33,7 +33,7 @@ for i in $(seq 1 "${BLOCKS}"); do
   echo "-> Pre-block ${i}: ${start_date}-${end_date}" >&2
   freqtrade download-data \
     --config "${CONFIG_PATH}" \
-    --timeframes ${TIMEFRAMES} \
+    -t ${TIMEFRAMES} \
     --timerange "${start_date}-${end_date}"
   end_date_iso="${start_date_iso}"
 done

@@ -29,7 +29,7 @@ while [[ "${current}" < "${END_DATE}" ]]; do
   echo "-> Block: ${cur_ymd}-${next}" >&2
   freqtrade download-data \
     --config "${CONFIG_PATH}" \
-    --timeframes ${TIMEFRAMES} \
+    -t ${TIMEFRAMES} \
     --timerange "${cur_ymd}-${next}"
 
   current_iso="${next_iso}"

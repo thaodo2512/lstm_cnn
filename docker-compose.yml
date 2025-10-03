@@ -90,14 +90,14 @@ services:
         (pip install --no-cache-dir -U six && pip install --no-cache-dir stable-baselines3 sb3-contrib) || true;
         echo "TIMEFRAMES=${TIMEFRAMES:-1h} TIMERANGE=${TIMERANGE:-20240101-20250930} BLOCKS=${BLOCKS:-3} BLOCK_DAYS=${BLOCK_DAYS:-30}";
         echo "Before download - available data:";
-        freqtrade list-data --config /freqtrade/user_data/config.json --timeframes "${TIMEFRAMES:-1h}" --show-timerange || true;
+        # list-data may not accept --timeframes in this Freqtrade version; show all timeranges
+        freqtrade list-data --config /freqtrade/user_data/config.json --show-timerange || true;
         # Ensure backtest-range data exists
-        freqtrade download-data --config /freqtrade/user_data/config.json --timeframes "${TIMEFRAMES:-1h}" --timerange "${TIMERANGE:-20240101-20250930}";
+        freqtrade download-data --config /freqtrade/user_data/config.json -t "${TIMEFRAMES:-1h}" --timerange "${TIMERANGE:-20240101-20250930}";
         # Ensure pre-start history exists for FreqAI training windows
-        bash /workspace/scripts/freqtrade_download_prestart_blocks.sh \
-          /freqtrade/user_data/config.json "${TIMEFRAMES:-1h}" "${TIMERANGE:-20240101-20250930}" "${BLOCKS:-3}" "${BLOCK_DAYS:-30}";
+        bash /workspace/scripts/freqtrade_download_prestart_blocks.sh /freqtrade/user_data/config.json "${TIMEFRAMES:-1h}" "${TIMERANGE:-20240101-20250930}" "${BLOCKS:-3}" "${BLOCK_DAYS:-30}";
         echo "After download - available data:";
-        freqtrade list-data --config /freqtrade/user_data/config.json --timeframes "${TIMEFRAMES:-1h}" --show-timerange;
+        freqtrade list-data --config /freqtrade/user_data/config.json --show-timerange || true;
         freqtrade backtesting --strategy FreqAIHybridExample --freqaimodel HybridTimeseriesFreqAIModel --config /freqtrade/user_data/config.json --timerange "${TIMERANGE:-20240101-20250930}" --cache day
 
   # Alternate local run: direct backtesting with explicit strategy (same mounts)

@@ -24,7 +24,7 @@ for i in $(seq 1 "${BLOCKS}"); do
   echo "-> Block ${i}: ${start_date}-${end_ymd}" >&2
   freqtrade download-data \
     --config "${CONFIG_PATH}" \
-    --timeframes ${TIMEFRAMES} \
+    -t ${TIMEFRAMES} \
     --timerange "${start_date}-${end_ymd}"
   end_date_iso="${start_date_iso}"
 done
