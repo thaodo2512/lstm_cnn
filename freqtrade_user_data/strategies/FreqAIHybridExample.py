@@ -39,15 +39,34 @@ class FreqAIHybridExample(IStrategy):
         return df
 
     def feature_engineering_expand_all(self, dataframe: DataFrame, period: int, metadata: dict, **kwargs) -> DataFrame:
-        """Create period-dependent features (expanded by FreqAI across periods/timeframes)."""
+        """Create period-dependent features (expanded by FreqAI across periods/timeframes).
+
+        Be robust to short slices (e.g., UI chart queries) by skipping indicators
+        that require a minimum window length.
+        """
         df = dataframe.copy()
         if RSIIndicator is not None:
-            df["%-rsi"] = RSIIndicator(close=df["close"], window=period).rsi()
-            df["%-ema"] = EMAIndicator(close=df["close"], window=period).ema_indicator()
-            df["%-adx"] = ADXIndicator(high=df["high"], low=df["low"], close=df["close"], window=period).adx()
+            try:
+                df["%-rsi"] = RSIIndicator(close=df["close"], window=period).rsi()
+            except Exception:
+                df["%-rsi"] = pd.Series(np.nan, index=df.index)
+            try:
+                df["%-ema"] = EMAIndicator(close=df["close"], window=period).ema_indicator()
+            except Exception:
+                df["%-ema"] = df["close"].ewm(span=max(1, period), adjust=False).mean()
+            # ADX requires at least `period` candles; guard to avoid negative dimensions
+            if len(df) >= max(2, period):
+                try:
+                    df["%-adx"] = ADXIndicator(
+                        high=df["high"], low=df["low"], close=df["close"], window=period
+                    ).adx()
+                except Exception:
+                    df["%-adx"] = pd.Series(np.nan, index=df.index)
+            else:
+                df["%-adx"] = pd.Series(np.nan, index=df.index)
         else:
             # Fallback: EMA + RSI (Wilder) via pandas
-            df["%-ema"] = df["close"].ewm(span=period, adjust=False).mean()
+            df["%-ema"] = df["close"].ewm(span=max(1, period), adjust=False).mean()
             delta = df["close"].diff()
             up = delta.clip(lower=0)
             down = -delta.clip(upper=0)
@@ -55,6 +74,7 @@ class FreqAIHybridExample(IStrategy):
             roll_down = down.ewm(alpha=1/14, adjust=False).mean()
             rs = roll_up / roll_down.replace(0, pd.NA)
             df["%-rsi"] = 100 - (100 / (1 + rs))
+            df["%-adx"] = pd.Series(np.nan, index=df.index)
         return df
 
     def feature_engineering_expand_basic(self, dataframe: DataFrame, metadata: dict, **kwargs) -> DataFrame:
