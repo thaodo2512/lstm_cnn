@@ -76,9 +76,9 @@ services:
       - ../tools:/freqtrade/tools
       - ../scripts:/freqtrade/scripts
     working_dir: /freqtrade
-    # Training FreqAI model explicitly
+    # Backtesting triggers FreqAI training + inference
     command: >
-      freqtrade train
+      freqtrade backtesting
       --strategy FreqAIHybridExample
       --freqaimodel HybridTimeseriesFreqAIModel
       --config /freqtrade/user_data/config.json
