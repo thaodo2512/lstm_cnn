@@ -176,7 +176,7 @@ services:
           "${BLOCK_DAYS:-30}";
         echo "Installing Freqtrade UI assets (if not present)...";
         freqtrade install-ui || true;
-        exec freqtrade webserver --config /freqtrade/user_data/config.json
+        exec freqtrade webserver --config /freqtrade/user_data/config.json --freqaimodel HybridTimeseriesFreqAIModel_tinhn
 
   # Optional: classification run example (commented). Enable by uncommenting.
   # crypto-train-gpu-l4-cls:
