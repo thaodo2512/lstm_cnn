@@ -13,11 +13,11 @@
     "ccxt_config": { "enableRateLimit": true },
     "ccxt_async_config": { "enableRateLimit": true },
     "pair_whitelist": ["BTC/USDT"],
-    "pair_blacklist": [],
-    "pairlists": [
-      { "method": "StaticPairList" }
-    ]
+    "pair_blacklist": []
   },
+  "pairlists": [
+    { "method": "StaticPairList" }
+  ],
   "freqai": {
     "enabled": true,
     "identifier": "BTC",

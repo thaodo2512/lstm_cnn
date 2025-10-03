@@ -4,6 +4,10 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project adheres to Semantic Versioning.
 
+## [0.1.4] - 2025-10-03
+### Fixed
+- freqai(config): Move `pairlists` to top-level in `freqtrade_user_data/config.json` and keep `pair_whitelist`/`pair_blacklist` under `exchange` to satisfy Freqtrade schema and fix startup validation error.
+
 ## [0.1.2] - 2025-10-03
 ### Changed
 - `scripts/setup_nvidia_l4_cuda_docker_ubuntu.sh`: Switch installer to `INSTALL_MODE=binary` for LTS branch (535) and update notes.
