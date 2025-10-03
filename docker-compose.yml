@@ -147,6 +147,10 @@ services:
     environment:
       PYTHONPATH: /workspace
       MPLBACKEND: Agg
+      TIMEFRAMES_WEBUI: ${TIMEFRAMES_WEBUI:-1h,5m}
+      TIMERANGE: ${TIMERANGE:-20240101-20250930}
+      BLOCKS: ${BLOCKS:-3}
+      BLOCK_DAYS: ${BLOCK_DAYS:-30}
     volumes:
       - ./:/workspace
       - ./freqtrade_user_data:/freqtrade/user_data
@@ -158,6 +162,13 @@ services:
       - -lc
       - |-
         set -euo pipefail
+        echo "Ensuring historical OHLCV for WebUI...";
+        bash /workspace/scripts/ensure_data_for_timeframes.sh \
+          /freqtrade/user_data/config.json \
+          "${TIMEFRAMES_WEBUI:-1h,5m}" \
+          "${TIMERANGE:-20240101-20250930}" \
+          "${BLOCKS:-3}" \
+          "${BLOCK_DAYS:-30}";
         echo "Installing Freqtrade UI assets (if not present)...";
         freqtrade install-ui || true;
         exec freqtrade webserver --config /freqtrade/user_data/config.json
