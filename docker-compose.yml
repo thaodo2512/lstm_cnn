@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   crypto-train-gpu-l4:
     build:
@@ -55,7 +53,7 @@ services:
             - driver: nvidia
               count: all
               capabilities: [gpu]
-    restart: unless-stopped
+    restart: "no"
     shm_size: "2g"
     environment:
       NVIDIA_VISIBLE_DEVICES: all
@@ -78,16 +76,14 @@ services:
       - ../tools:/freqtrade/tools
       - ../scripts:/freqtrade/scripts
     working_dir: /freqtrade
-    # Ensure your /freqtrade/user_data/config.json enables FreqAI and references our model:
-    #   "module_path": "hybrid_lstm_transformer_crypto",
-    #   "class_name": "HybridTimeseriesFreqAIModel"
-    # Backtesting will trigger FreqAI training if configured
-    command: [
-      "freqtrade", "backtesting",
-      "--config", "/freqtrade/user_data/config.json",
-      "--freqaimodel", "HybridTimeseriesFreqAIModel",
-      "--timerange", "${TIMERANGE:-20240101-20250930}"
-    ]
+    # Training FreqAI model explicitly
+    command: >
+      freqtrade train
+      --strategy FreqAIHybridExample
+      --freqaimodel HybridTimeseriesFreqAIModel
+      --config /freqtrade/user_data/config.json
+      --timerange ${TIMERANGE:-20240101-20250930}
+      --cache day
 
   # Alternate local run: direct backtesting with explicit strategy (same mounts)
   freqai-backtest-gpu-l4:

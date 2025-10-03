@@ -21,7 +21,6 @@
   "freqai": {
     "enabled": true,
     "identifier": "BTC",
-    "model_classname": "HybridTimeseriesFreqAIModel",
     "train_period_days": 30,
     "backtest_period_days": 7,
     "feature_parameters": {
