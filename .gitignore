@@ -1,0 +1,24 @@
+# Byte-compiled / cache
+__pycache__/
+*.py[cod]
+
+# Environments / IDE
+.env
+.venv/
+venv/
+.idea/
+.vscode/
+.DS_Store
+
+# Data / artifacts
+data/
+logs/
+*.pt
+*.pkl
+metrics.json
+prediction_plot.png
+attention_heatmap.png
+
+# Jupyter
+.ipynb_checkpoints/
+
