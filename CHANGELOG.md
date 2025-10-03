@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
 
 The format is based on Keep a Changelog, and this project adheres to Semantic Versioning.
 
+## [0.1.26] - 2025-10-03
+### Added
+- feat(strategy): Volatility-aware entry/exit for `FreqAIHybridExample` using ATR(14) + EMA(200) trend filter.
+  - Indicators: Add `atr`, `ema200`, and derive `atr_pct = atr/close`, `pred_ret = (&-prediction-close)/close`.
+  - Entry (regression): `pred_ret > fee_buffer + 0.5*atr_pct` AND `close > ema200` (gated by `do_predict`).
+  - Exit (regression): `pred_ret < -(fee_buffer + 0.5*atr_pct)` (gated by `do_predict`).
+  - Classification thresholds unchanged.
+  - Enable basic trailing stop: 1% activation offset, 0.5% trail.
+
 ## [0.1.25] - 2025-10-03
 ### Performance
 - perf(freqai): Add a fast GPU profile for backtesting/training.

@@ -8,8 +8,9 @@ import numpy as np
 try:
     from ta.momentum import RSIIndicator
     from ta.trend import EMAIndicator, ADXIndicator
+    from ta.volatility import AverageTrueRange
 except Exception:  # pragma: no cover - optional dependency
-    RSIIndicator = EMAIndicator = ADXIndicator = None  # type: ignore
+    RSIIndicator = EMAIndicator = ADXIndicator = AverageTrueRange = None  # type: ignore
 
 
 class FreqAIHybridExample(IStrategy):
@@ -23,13 +24,49 @@ class FreqAIHybridExample(IStrategy):
     timeframe = "1h"
     minimal_roi = {"0": 0.02}
     stoploss = -0.10
+    # Basic trailing stop configuration (can be tuned)
+    trailing_stop = True
+    trailing_only_offset_is_reached = True
+    trailing_stop_positive = 0.005  # 0.5%
+    trailing_stop_positive_offset = 0.01  # activate after 1%
     # Allow enough history for indicators and label shifts
     startup_candle_count: int = 240
 
     def populate_indicators(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         # Trigger FreqAI pipeline (training/prediction and column injection)
-        dataframe = self.freqai.start(dataframe, metadata, self)
-        return dataframe
+        df = self.freqai.start(dataframe, metadata, self)
+
+        # Add ATR(14) and EMA(200) for volatility-aware thresholds and trend filter
+        try:
+            if AverageTrueRange is not None:
+                atr_ind = AverageTrueRange(high=df["high"], low=df["low"], close=df["close"], window=14)
+                df["atr"] = atr_ind.average_true_range()
+            else:
+                # Fallback ATR: simple rolling mean of True Range
+                prev_close = df["close"].shift(1)
+                tr = pd.concat([
+                    (df["high"] - df["low"]).abs(),
+                    (df["high"] - prev_close).abs(),
+                    (df["low"] - prev_close).abs(),
+                ], axis=1).max(axis=1)
+                df["atr"] = tr.rolling(window=14, min_periods=1).mean()
+        except Exception:
+            # Ensure column exists even if computation fails
+            df["atr"] = pd.Series(np.nan, index=df.index)
+
+        try:
+            if EMAIndicator is not None:
+                df["ema200"] = EMAIndicator(close=df["close"], window=200).ema_indicator()
+            else:
+                df["ema200"] = df["close"].ewm(span=200, adjust=False).mean()
+        except Exception:
+            df["ema200"] = df["close"].ewm(span=200, adjust=False).mean()
+
+        # Derived helpers
+        df["atr_pct"] = (df["atr"] / df["close"]).replace([np.inf, -np.inf], np.nan)
+        if "&-prediction" in df.columns:
+            df["pred_ret"] = (df["&-prediction"] - df["close"]) / df["close"]
+        return df
 
     # --------- FreqAI required hooks ---------
     def set_freqai_targets(self, dataframe: DataFrame, metadata: dict, **kwargs) -> DataFrame:
@@ -97,13 +134,16 @@ class FreqAIHybridExample(IStrategy):
         df["enter_long"] = 0
         pred_col = "&-prediction" if "&-prediction" in df.columns else ("&-pred_up_prob" if "&-pred_up_prob" in df.columns else None)
         if pred_col is not None:
-            if pred_col == "&-prediction":
+            if pred_col == "&-prediction" and all(c in df.columns for c in ["pred_ret", "atr_pct", "ema200"]):
+                fee_buffer = 0.0015  # ~0.15% total fees; tune per exchange
+                cond = (df["pred_ret"] > (fee_buffer + 0.5 * df["atr_pct"])) & (df["close"] > df["ema200"])
+            elif pred_col == "&-prediction":
                 cond = df[pred_col] > df["close"] * 1.001
             else:
                 cond = df[pred_col] > 0.55
             if "do_predict" in df.columns:
                 cond = cond & (df["do_predict"] == 1)
-            df.loc[cond, "enter_long"] = 1
+            df.loc[cond.fillna(False), "enter_long"] = 1
         return df
 
     def populate_exit_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
@@ -111,11 +151,14 @@ class FreqAIHybridExample(IStrategy):
         df["exit_long"] = 0
         pred_col = "&-prediction" if "&-prediction" in df.columns else ("&-pred_up_prob" if "&-pred_up_prob" in df.columns else None)
         if pred_col is not None:
-            if pred_col == "&-prediction":
+            if pred_col == "&-prediction" and all(c in df.columns for c in ["pred_ret", "atr_pct"]):
+                fee_buffer = 0.0015
+                cond = (df["pred_ret"] < -(fee_buffer + 0.5 * df["atr_pct"]))
+            elif pred_col == "&-prediction":
                 cond = df[pred_col] < df["close"] * 0.999
             else:
                 cond = df[pred_col] < 0.45
             if "do_predict" in df.columns:
                 cond = cond & (df["do_predict"] == 1)
-            df.loc[cond, "exit_long"] = 1
+            df.loc[cond.fillna(False), "exit_long"] = 1
         return df
