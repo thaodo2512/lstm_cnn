@@ -3,6 +3,8 @@
   "stake_currency": "USDT",
   "stake_amount": "unlimited",
   "fiat_display_currency": "USD",
+  "trading_mode": "futures",
+  "margin_mode": "isolated",
   "timeframe": "1h",
   "dry_run": true,
   "strategy": "FreqAIHybridExample",
