@@ -32,10 +32,10 @@ class FreqAIHybridExample(IStrategy):
 
     # --------- FreqAI required hooks ---------
     def set_freqai_targets(self, dataframe: DataFrame, metadata: dict, **kwargs) -> DataFrame:
-        """Define target '&-prediction' as mean of future closes over label_period."""
+        """Define target '&-prediction' as close shifted -label_period (reduces NaNs)."""
         label_period = int(self.freqai_info.get("feature_parameters", {}).get("label_period_candles", 24))
         df = dataframe.copy()
-        df["&-prediction"] = df["close"].shift(-label_period).rolling(label_period).mean()
+        df["&-prediction"] = df["close"].shift(-label_period)
         return df
 
     def feature_engineering_expand_all(self, dataframe: DataFrame, period: int, metadata: dict, **kwargs) -> DataFrame:

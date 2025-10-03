@@ -47,6 +47,11 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 ### Fixed
 - freqai(model): Inherit from `BasePyTorchRegressor` and implement `data_convertor` to satisfy abstract interface (`train` provided by base, `fit/predict` implemented here).
 
+## [0.1.14] - 2025-10-03
+### Fixed
+- freqai(strategy): Simplify target to `shift(-label_period)` (remove rolling mean) to reduce label NaNs during training.
+- freqai(compose): Download a wider data range via `DOWNLOAD_TIMERANGE` (defaults to start a year earlier) to ensure enough pre-backtest history for FreqAI training windows.
+
 ## [0.1.2] - 2025-10-03
 ### Changed
 - `scripts/setup_nvidia_l4_cuda_docker_ubuntu.sh`: Switch installer to `INSTALL_MODE=binary` for LTS branch (535) and update notes.
