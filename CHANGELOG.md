@@ -86,6 +86,10 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 ### Added
 - compose(webui): Add `freqtrade-webui` service exposing FreqUI on `http://localhost:8080`, mounting `freqtrade_user_data` so the UI can access the same configuration. Enable API server in `freqtrade_user_data/config.json`. Backtesting service now exports trades JSON to `/freqtrade/user_data/backtest_results/freqai_trades.json` for easy viewing via FreqUI Backtesting page (Upload Results).
 
+## [0.1.22] - 2025-10-03
+### Fixed
+- webui: Install Freqtrade UI assets at container start (`freqtrade install-ui`) and persist them in a named volume (`freqtrade_ui_data`). Fixes "Freqtrade UI not installed" error when opening the Web UI.
+
 ## [0.1.2] - 2025-10-03
 ### Changed
 - `scripts/setup_nvidia_l4_cuda_docker_ubuntu.sh`: Switch installer to `INSTALL_MODE=binary` for LTS branch (535) and update notes.
