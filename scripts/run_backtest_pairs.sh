@@ -19,11 +19,12 @@ echo "Pairs: $PAIRS_CSV"
 echo "Timerange: $TIMERANGE  Timeframes: $TIMEFRAMES  Strategy: $STRATEGY  Model: $FREQAIMODEL"
 
 # Build temporary config with custom whitelist via Python (avoids jq dependency)
-python - <<'PY'
+PAIRS_CSV_EXPORT="$PAIRS_CSV" python - <<'PY'
 import json, os, sys
 src = os.environ.get('CONFIG_IN')
 dst = os.environ.get('CONFIG_TMP')
-pairs = [p.strip() for p in os.environ.get('PAIRS_CSV','').split(',') if p.strip()]
+pairs_raw = os.environ.get('PAIRS') or os.environ.get('PAIRS_CSV') or ''
+pairs = [p.strip() for p in pairs_raw.split(',') if p.strip()]
 if not pairs:
     print('No pairs provided via PAIRS env.', file=sys.stderr)
     sys.exit(2)

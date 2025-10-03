@@ -191,3 +191,5 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 ### Fixed
 - fix(config): Enable `trading_mode: futures` and `margin_mode: isolated` in `freqtrade_user_data/config.json` so WebUI backtests can run short strategies.
 - fix(exchange): Set `ccxt_config.options.defaultType=future` (and async) for Binance to ensure futures markets are loaded, preventing pairlist from removing futures pairs as "not tradable".
+### Fixed
+- fix(scripts): Read `PAIRS` (fallback `PAIRS_CSV`) inside helper scripts so multiple pairs passed via compose env are recognized. Prevents "No pairs provided via PAIRS env." errors.
