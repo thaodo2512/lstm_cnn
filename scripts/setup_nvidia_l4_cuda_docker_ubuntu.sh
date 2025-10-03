@@ -13,9 +13,9 @@
 
 set -e
 
-# Set installation parameters for NVIDIA L4 (LTS branch 535, repo mode)
+# Set installation parameters for NVIDIA L4 (LTS branch 535, binary mode required for LTS)
 INSTALL_BRANCH="lts"
-INSTALL_MODE="repo"
+INSTALL_MODE="binary"
 INSTALL_DIR="/opt/google/cuda-installer"
 
 # Download NVIDIA installer if not already present
@@ -74,4 +74,3 @@ echo "Installation complete. If the VM was rebooted during installation, verify 
 echo "It should show your NVIDIA L4 GPU with driver version ~535 and CUDA ~12.2 or later."
 echo "To test GPU in Docker: docker run --rm --runtime=nvidia --gpus all ubuntu nvidia-smi"
 echo "Log out and back in (or run 'newgrp docker') to use Docker without sudo."
-
