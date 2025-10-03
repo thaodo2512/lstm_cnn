@@ -78,6 +78,10 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 ### Fixed
 - freqai(model): Replace call to removed `dk.make_test_data_point` with supported `dk.filter_features(..., training_filter=False)` and `dk.feature_pipeline.transform(..., outlier_check=True)` in `HybridTimeseriesFreqAIModel.predict()`. Build sliding windows across the backtest slice, batch-infer, align predictions back to full length, and return `do_predict`/`DI_values` from the pipeline. Fixes `AttributeError: 'FreqaiDataKitchen' object has no attribute 'make_test_data_point'` during backtesting.
 
+## [0.1.20] - 2025-10-03
+### Fixed
+- freqai(model): Unwrap saved Trainer wrapper to the underlying `nn.Module` inside `predict()` and normalize device handling to `torch.device`. This fixes `AttributeError` at `model.eval()` when backtesting loads the saved object. Also guard access to the optional `di` pipeline step to avoid noisy warnings when `DI_threshold` is not configured.
+
 ## [0.1.2] - 2025-10-03
 ### Changed
 - `scripts/setup_nvidia_l4_cuda_docker_ubuntu.sh`: Switch installer to `INSTALL_MODE=binary` for LTS branch (535) and update notes.

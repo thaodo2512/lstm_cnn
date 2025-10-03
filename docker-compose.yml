@@ -98,7 +98,15 @@ services:
         bash /workspace/scripts/freqtrade_download_prestart_blocks.sh /freqtrade/user_data/config.json "${TIMEFRAMES:-1h}" "${TIMERANGE:-20240101-20250930}" "${BLOCKS:-3}" "${BLOCK_DAYS:-30}";
         echo "After download - available data:";
         freqtrade list-data --config /freqtrade/user_data/config.json --show-timerange || true;
-        freqtrade backtesting --strategy FreqAIHybridExample --freqaimodel HybridTimeseriesFreqAIModel --config /freqtrade/user_data/config.json --timerange "${TIMERANGE:-20240101-20250930}" --cache day
+        mkdir -p /freqtrade/user_data/backtest_results;
+        freqtrade backtesting \
+          --strategy FreqAIHybridExample \
+          --freqaimodel HybridTimeseriesFreqAIModel \
+          --config /freqtrade/user_data/config.json \
+          --timerange "${TIMERANGE:-20240101-20250930}" \
+          --cache day \
+          --export trades \
+          --export-filename /freqtrade/user_data/backtest_results/freqai_trades.json
 
   # Alternate local run: direct backtesting with explicit strategy (same mounts)
   freqai-backtest-gpu-l4:
@@ -125,6 +133,27 @@ services:
       "--freqaimodel", "HybridTimeseriesFreqAIModel",
       "--strategy", "FreqAIHybridExample",
       "--timerange", "${TIMERANGE:-20240101-20250930}"
+    ]
+
+  # Freqtrade Web UI (FreqUI) to inspect results and interact with the bot
+  freqtrade-webui:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.freqtrade.gpu.x86
+    container_name: freqtrade_webui
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      PYTHONPATH: /workspace
+      MPLBACKEND: Agg
+    volumes:
+      - ./:/workspace
+      - ./freqtrade_user_data:/freqtrade/user_data
+    working_dir: /freqtrade
+    command: [
+      "freqtrade", "webserver",
+      "--config", "/freqtrade/user_data/config.json"
     ]
 
   # Optional: classification run example (commented). Enable by uncommenting.
