@@ -9,6 +9,9 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 - `scripts/setup_nvidia_l4_cuda_docker_ubuntu.sh` — Host setup script for Ubuntu (22.04/24.04) on GCP to install NVIDIA L4 (535 LTS) drivers, CUDA toolkit, Docker, and NVIDIA Container Toolkit, with docker group configuration.
  - `docker/Dockerfile.freqtrade.gpu.x86` — GPU-enabled image with Freqtrade + FreqAI on top of PyTorch CUDA runtime.
  - `docker-compose.yml` service `freqai-train-gpu-l4` — Runs Freqtrade backtesting with GPU, imports our custom FreqAI model via `PYTHONPATH`.
+ - `freqtrade_user_data/config.json` — Minimal FreqAI config referencing our model.
+ - `freqtrade_user_data/strategies/FreqAIHybridExample.py` — Example strategy consuming FreqAI predictions.
+ - `.env` — Defaults for compose (epochs, horizon, batch_size, timerange, etc.).
 
 ## [0.1.0] - 2025-10-03
 ### Added

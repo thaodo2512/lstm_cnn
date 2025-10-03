@@ -63,8 +63,10 @@ services:
       TIMERANGE: ${TIMERANGE:-20240101-20250930}
     volumes:
       - ./:/workspace
-      # Mount your freqtrade user_data folder (adjust path as needed)
-      - ../user_data:/freqtrade/user_data
+      # Option A: Use local example user_data provided by this repo
+      - ./freqtrade_user_data:/freqtrade/user_data
+      # Option B: Use your external user_data folder (uncomment and adjust path)
+      # - ../user_data:/freqtrade/user_data
       # Optional mounts if you keep additional scripts/tools
       - ../tools:/freqtrade/tools
       - ../scripts:/freqtrade/scripts
@@ -76,6 +78,32 @@ services:
     command: [
       "freqtrade", "backtesting",
       "--config", "/freqtrade/user_data/config.json",
+      "--timerange", "${TIMERANGE:-20240101-20250930}"
+    ]
+
+  # Alternate local run: direct backtesting with explicit strategy (same mounts)
+  freqai-backtest-gpu-l4:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.freqtrade.gpu.x86
+    container_name: freqai_backtest_gpu_l4
+    gpus: all
+    restart: "no"
+    shm_size: "2g"
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+      PYTHONPATH: /workspace
+      FREQAI_DEVICE: cuda
+      MPLBACKEND: Agg
+    volumes:
+      - ./:/workspace
+      - ./freqtrade_user_data:/freqtrade/user_data
+    working_dir: /freqtrade
+    command: [
+      "freqtrade", "backtesting",
+      "--config", "/freqtrade/user_data/config.json",
+      "--strategy", "FreqAIHybridExample",
       "--timerange", "${TIMERANGE:-20240101-20250930}"
     ]
 

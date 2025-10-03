@@ -1,0 +1,55 @@
+{
+  "max_open_trades": 1,
+  "stake_currency": "USDT",
+  "stake_amount": "unlimited",
+  "fiat_display_currency": "USD",
+  "timeframe": "1h",
+  "dry_run": true,
+  "strategy": "FreqAIHybridExample",
+  "pairlists": [
+    { "method": "StaticPairList", "pairs": ["BTC/USDT"] }
+  ],
+  "exchange": {
+    "name": "binance",
+    "key": "",
+    "secret": "",
+    "ccxt_config": { "enableRateLimit": true },
+    "ccxt_async_config": { "enableRateLimit": true }
+  },
+  "freqai": {
+    "enabled": true,
+    "identifier": "BTC",
+    "module_path": "hybrid_lstm_transformer_crypto",
+    "class_name": "HybridTimeseriesFreqAIModel",
+    "save_model": true,
+    "load_model": false,
+    "model_training_parameters": {
+      "window_size": 60,
+      "horizon": 1,
+      "stride": 1,
+      "batch_size": 32,
+      "epochs": 20,
+      "lr": 0.001,
+      "grad_clip": 1.0,
+      "early_stopping_patience": 10,
+      "use_minmax": false,
+      "num_workers": 2,
+      "variable_lengths": false,
+      "min_seq_len": 20,
+      "pooling": "last",
+      "classification": false,
+      "capture_attention": false,
+      "bidirectional": false,
+      "lstm_hidden": 128,
+      "lstm_layers": 2,
+      "lstm_dropout": 0.1,
+      "d_model": 128,
+      "nhead": 4,
+      "num_transformer_layers": 1,
+      "ff_dim": 512,
+      "transformer_dropout": 0.1,
+      "compile_model": false
+    }
+  }
+}
+
