@@ -43,6 +43,10 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 ### Fixed
 - freqai(compose): Switch to YAML list-form `command` with `bash -lc` and a folded script to avoid shell quoting issues that caused `syntax error: unexpected end of file`.
 
+## [0.1.13] - 2025-10-03
+### Fixed
+- freqai(model): Inherit from `BasePyTorchRegressor` and implement `data_convertor` to satisfy abstract interface (`train` provided by base, `fit/predict` implemented here).
+
 ## [0.1.2] - 2025-10-03
 ### Changed
 - `scripts/setup_nvidia_l4_cuda_docker_ubuntu.sh`: Switch installer to `INSTALL_MODE=binary` for LTS branch (535) and update notes.

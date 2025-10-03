@@ -822,8 +822,12 @@ def plot_attention_heatmap(attn: torch.Tensor, out_path: str) -> None:
 # ---------------------------------------------
 
 try:
-    # Import BasePyTorchModel class explicitly (not the module) for correct subclassing
-    from freqtrade.freqai.base_models.BasePyTorchModel import BasePyTorchModel  # type: ignore
+    # Use PyTorch regressor base which provides default train(), we implement fit()/predict()
+    from freqtrade.freqai.base_models.BasePyTorchRegressor import BasePyTorchRegressor  # type: ignore
+    from freqtrade.freqai.torch.PyTorchDataConvertor import (  # type: ignore
+        DefaultPyTorchDataConvertor,
+        PyTorchDataConvertor,
+    )
     from freqtrade.freqai.data_kitchen import FreqaiDataKitchen  # type: ignore
 except Exception:
     class BasePyTorchModel:  # type: ignore
@@ -836,7 +840,7 @@ except Exception:
     FreqaiDataKitchen = Any  # type: ignore
 
 
-class HybridTimeseriesFreqAIModel(BasePyTorchModel):  # type: ignore
+class HybridTimeseriesFreqAIModel(BasePyTorchRegressor):  # type: ignore
     """FreqAI-compatible wrapper around the hybrid LSTM+Transformer model.
 
     The adapter converts FreqAI feature/label dataframes into sliding windows,
@@ -853,6 +857,12 @@ class HybridTimeseriesFreqAIModel(BasePyTorchModel):  # type: ignore
         self.feature_columns: Optional[List[str]] = None
         self.label_columns: Optional[List[str]] = None
         self.device: Optional[torch.device] = None
+
+    # Provide data converter for BasePyTorch* pipeline
+    @property
+    def data_convertor(self) -> "PyTorchDataConvertor":  # type: ignore[override]
+        # Regression default: float targets; shape kept as-is by DefaultPyTorchDataConvertor
+        return DefaultPyTorchDataConvertor(target_tensor_type=torch.float)
 
     def _resolve_config(self) -> TrainConfig:
         params = self.freqai_info.get("model_training_parameters", {}) if hasattr(self, "freqai_info") else {}
