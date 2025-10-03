@@ -41,3 +41,8 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 - `docker-compose.yml` — Compose service `crypto-train-gpu-l4` to train with GPU and map artifacts.
 # Changelog
 # Changelog
+# Changelog
+
+## [0.1.3] - 2025-10-03
+### Changed
+- `docker/Dockerfile.freqtrade.gpu.x86`: Bump Freqtrade to `2025.9` (with `freqai,plot` extras).

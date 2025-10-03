@@ -16,7 +16,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 # Install Freqtrade with FreqAI extras (CPU/GPU - PyTorch CUDA provided by base image)
 RUN pip install --no-cache-dir \
-        "freqtrade[freqai,plot]>=2024.8" \
+        "freqtrade[freqai,plot]==2025.9" \
         numpy pandas scikit-learn matplotlib \
         ccxt yfinance pandas_datareader ta
 
@@ -27,4 +27,3 @@ COPY . /workspace
 
 # Default entrypoint can be overridden by docker-compose
 CMD ["freqtrade", "--help"]
-
