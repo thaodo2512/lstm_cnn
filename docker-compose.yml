@@ -78,12 +78,17 @@ services:
     working_dir: /freqtrade
     # Backtesting triggers FreqAI training + inference
     command: >
-      freqtrade backtesting
-      --strategy FreqAIHybridExample
-      --freqaimodel HybridTimeseriesFreqAIModel
-      --config /freqtrade/user_data/config.json
-      --timerange ${TIMERANGE:-20240101-20250930}
-      --cache day
+      bash -lc "
+      freqtrade download-data \
+        --config /freqtrade/user_data/config.json \
+        --timeframes 1h \
+        --timerange ${TIMERANGE:-20240101-20250930} \
+      && freqtrade backtesting \
+        --strategy FreqAIHybridExample \
+        --freqaimodel HybridTimeseriesFreqAIModel \
+        --config /freqtrade/user_data/config.json \
+        --timerange ${TIMERANGE:-20240101-20250930} \
+        --cache day"
 
   # Alternate local run: direct backtesting with explicit strategy (same mounts)
   freqai-backtest-gpu-l4:

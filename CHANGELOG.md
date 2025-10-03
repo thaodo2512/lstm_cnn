@@ -16,6 +16,10 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 ### Fixed
 - freqai(strategy): Update strategy to import `IStrategy` from `freqtrade.strategy.interface` and drop deprecated `IFreqaiInterface` import/usage. Aligns with current Freqtrade FreqAI integration where `self.freqai` is injected by the framework.
 
+## [0.1.7] - 2025-10-03
+### Fixed
+- freqai(compose): Prepend `freqtrade download-data` in `freqai-train-gpu-l4` service to fetch OHLCV before backtesting, preventing "No data found" errors.
+
 ## [0.1.2] - 2025-10-03
 ### Changed
 - `scripts/setup_nvidia_l4_cuda_docker_ubuntu.sh`: Switch installer to `INSTALL_MODE=binary` for LTS branch (535) and update notes.
