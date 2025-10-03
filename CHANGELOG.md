@@ -1,0 +1,20 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on Keep a Changelog, and this project adheres to Semantic Versioning.
+
+## [0.1.0] - 2025-10-03
+### Added
+- `hybrid_lstm_transformer_crypto.py` — Hybrid LSTM + Transformer encoder for crypto time-series forecasting (BTC OHLCV).
+  - Data: Fetch BTC/USDT hourly via ccxt; fallback to yfinance and pandas_datareader with logging.
+  - Indicators: RSI(14), EMA(12), EMA(26); NaN handling.
+  - Windows: Sliding windows (configurable window, stride, horizon 1..5).
+  - Model: Stacked LSTM → PositionalEncoding → TransformerEncoder → pooling → regression/classification head.
+  - Training: Mixed precision on CUDA, ReduceLROnPlateau, early stopping, gradient clipping, reproducibility.
+  - Dataloaders: pin_memory on CUDA, persistent_workers, optional variable lengths + masks.
+  - Evaluation: Test MAE/RMSE, predicted vs actual plot; saves best checkpoint and metrics JSON.
+  - Inference: `predict()` scales, masks, inverse-transforms; batch inference.
+  - Attention: Optional self-attention capture and heatmap.
+  - FreqAI: Example BasePyTorchModel-compatible wrapper and config snippet.
+
