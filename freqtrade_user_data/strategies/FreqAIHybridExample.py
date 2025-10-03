@@ -24,6 +24,9 @@ class FreqAIHybridExample(IStrategy):
     timeframe = "1h"
     minimal_roi = {"0": 0.02}
     stoploss = -0.10
+    # Allow short positions
+    can_short: bool = True
+
     # Basic trailing stop configuration (can be tuned)
     trailing_stop = True
     trailing_only_offset_is_reached = True
@@ -132,33 +135,45 @@ class FreqAIHybridExample(IStrategy):
     def populate_entry_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         df = dataframe.copy()
         df["enter_long"] = 0
+        df["enter_short"] = 0
         pred_col = "&-prediction" if "&-prediction" in df.columns else ("&-pred_up_prob" if "&-pred_up_prob" in df.columns else None)
         if pred_col is not None:
             if pred_col == "&-prediction" and all(c in df.columns for c in ["pred_ret", "atr_pct", "ema200"]):
                 fee_buffer = 0.0015  # ~0.15% total fees; tune per exchange
-                cond = (df["pred_ret"] > (fee_buffer + 0.5 * df["atr_pct"])) & (df["close"] > df["ema200"])
+                long_cond = (df["pred_ret"] > (fee_buffer + 0.5 * df["atr_pct"])) & (df["close"] > df["ema200"])
+                short_cond = (df["pred_ret"] < -(fee_buffer + 0.5 * df["atr_pct"])) & (df["close"] < df["ema200"])
             elif pred_col == "&-prediction":
-                cond = df[pred_col] > df["close"] * 1.001
+                long_cond = df[pred_col] > df["close"] * 1.001
+                short_cond = df[pred_col] < df["close"] * 0.999
             else:
-                cond = df[pred_col] > 0.55
+                long_cond = df[pred_col] > 0.55
+                short_cond = df[pred_col] < 0.45
             if "do_predict" in df.columns:
-                cond = cond & (df["do_predict"] == 1)
-            df.loc[cond.fillna(False), "enter_long"] = 1
+                long_cond = long_cond & (df["do_predict"] == 1)
+                short_cond = short_cond & (df["do_predict"] == 1)
+            df.loc[long_cond.fillna(False), "enter_long"] = 1
+            df.loc[short_cond.fillna(False), "enter_short"] = 1
         return df
 
     def populate_exit_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         df = dataframe.copy()
         df["exit_long"] = 0
+        df["exit_short"] = 0
         pred_col = "&-prediction" if "&-prediction" in df.columns else ("&-pred_up_prob" if "&-pred_up_prob" in df.columns else None)
         if pred_col is not None:
             if pred_col == "&-prediction" and all(c in df.columns for c in ["pred_ret", "atr_pct"]):
                 fee_buffer = 0.0015
-                cond = (df["pred_ret"] < -(fee_buffer + 0.5 * df["atr_pct"]))
+                long_cond = (df["pred_ret"] < -(fee_buffer + 0.5 * df["atr_pct"]))
+                short_cond = (df["pred_ret"] > (fee_buffer + 0.5 * df["atr_pct"]))
             elif pred_col == "&-prediction":
-                cond = df[pred_col] < df["close"] * 0.999
+                long_cond = df[pred_col] < df["close"] * 0.999
+                short_cond = df[pred_col] > df["close"] * 1.001
             else:
-                cond = df[pred_col] < 0.45
+                long_cond = df[pred_col] < 0.45
+                short_cond = df[pred_col] > 0.55
             if "do_predict" in df.columns:
-                cond = cond & (df["do_predict"] == 1)
-            df.loc[cond.fillna(False), "exit_long"] = 1
+                long_cond = long_cond & (df["do_predict"] == 1)
+                short_cond = short_cond & (df["do_predict"] == 1)
+            df.loc[long_cond.fillna(False), "exit_long"] = 1
+            df.loc[short_cond.fillna(False), "exit_short"] = 1
         return df
