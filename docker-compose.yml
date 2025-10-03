@@ -150,11 +150,17 @@ services:
     volumes:
       - ./:/workspace
       - ./freqtrade_user_data:/freqtrade/user_data
+      # Persist UI assets across restarts to avoid re-downloading
+      - freqtrade_ui_data:/root/.local/share/freqtrade
     working_dir: /freqtrade
-    command: [
-      "freqtrade", "webserver",
-      "--config", "/freqtrade/user_data/config.json"
-    ]
+    command:
+      - bash
+      - -lc
+      - |-
+        set -euo pipefail
+        echo "Installing Freqtrade UI assets (if not present)...";
+        freqtrade install-ui || true;
+        exec freqtrade webserver --config /freqtrade/user_data/config.json
 
   # Optional: classification run example (commented). Enable by uncommenting.
   # crypto-train-gpu-l4-cls:
@@ -184,3 +190,6 @@ services:
   #     "--source", "${SOURCE:-auto}",
   #     "--out_dir", "artifacts"
   #   ]
+
+volumes:
+  freqtrade_ui_data:
