@@ -1034,8 +1034,14 @@ class HybridTimeseriesFreqAIModel(BasePyTorchRegressor):  # type: ignore
             raise RuntimeError("Model has not been fitted before predict call.")
 
         cfg = self.cfg
-        model = self.model
-        device = self.device or get_device()
+        base_model = self.model
+        # unwrap saved trainer wrappers (BasePyTorchRegressor saves wrapper objects via DataDrawer)
+        torch_model = base_model.model if hasattr(base_model, "model") else base_model  # type: ignore[assignment]
+        # Normalize device type to torch.device
+        if isinstance(self.device, str):
+            device = torch.device(self.device)
+        else:
+            device = self.device or get_device()
 
         # 1) Build feature dataframe via DK (ensures same feature list as training)
         try:
@@ -1057,8 +1063,20 @@ class HybridTimeseriesFreqAIModel(BasePyTorchRegressor):  # type: ignore
                 dk.data_dictionary["prediction_features"], outlier_check=True
             )
             dk.data_dictionary["prediction_features"] = pred_feats
-            if getattr(dk.feature_pipeline, "__getitem__", None) and dk.feature_pipeline["di"]:
-                di_values = dk.feature_pipeline["di"].di_values
+            # Only query DI step if configured to avoid noisy warnings from the pipeline
+            di_threshold = (
+                self.freqai_info.get("feature_parameters", {}).get("DI_threshold", 0)
+                if hasattr(self, "freqai_info") else 0
+            )
+            if di_threshold:
+                try:
+                    di_step = dk.feature_pipeline["di"]  # may warn if absent
+                except Exception:
+                    di_step = None
+                if di_step is not None:
+                    di_values = di_step.di_values  # type: ignore[attr-defined]
+                else:
+                    di_values = np.zeros(len(pred_feats), dtype=np.float32)
             else:
                 di_values = np.zeros(len(pred_feats), dtype=np.float32)
         except Exception:
@@ -1101,7 +1119,7 @@ class HybridTimeseriesFreqAIModel(BasePyTorchRegressor):  # type: ignore
         dummy_y = np.zeros((len(X_windows), cfg.horizon), dtype=np.float32)
         X_scaled, _ = apply_scalers(X_windows, dummy_y, self.x_scaler, self.y_scaler, cfg.classification)
 
-        model.eval()
+        torch_model.eval()
         preds_list: List[np.ndarray] = []
         with torch.no_grad(), torch.cuda.amp.autocast(enabled=(device.type == "cuda")):
             # Use the dataset/collate to keep behavior consistent with training
@@ -1112,7 +1130,7 @@ class HybridTimeseriesFreqAIModel(BasePyTorchRegressor):  # type: ignore
                 key_padding_mask = batch.get("key_padding_mask")
                 if key_padding_mask is not None:
                     key_padding_mask = key_padding_mask.to(device, non_blocking=True)
-                y_hat, _ = model(x, key_padding_mask=key_padding_mask)
+                y_hat, _ = torch_model(x, key_padding_mask=key_padding_mask)
                 preds_list.append(y_hat.detach().cpu().numpy())
         preds_np = np.concatenate(preds_list, axis=0) if preds_list else np.zeros((0, cfg.horizon), dtype=np.float32)
 
