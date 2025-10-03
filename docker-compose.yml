@@ -136,6 +136,41 @@ services:
       "--timerange", "${TIMERANGE:-20240101-20240201}"
     ]
 
+  # Backtest specific pairs via env PAIRS (comma-separated) using a temp config
+  freqai-backtest-pairs-gpu-l4:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.freqtrade.gpu.x86
+    container_name: freqai_backtest_pairs_gpu_l4
+    gpus: all
+    restart: "no"
+    shm_size: "2g"
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+      PYTHONPATH: /workspace
+      FREQAI_DEVICE: cuda
+      MPLBACKEND: Agg
+      # Inputs
+      PAIRS: ${PAIRS:-BTC/USDT:USDT}
+      TIMEFRAMES: ${TIMEFRAMES:-1h}
+      TIMERANGE: ${TIMERANGE:-20240101-20240201}
+      STRATEGY: ${STRATEGY:-FreqAIHybridExample}
+      FREQAIMODEL: ${FREQAIMODEL:-HybridTimeseriesFreqAIModel_tinhn}
+      BLOCKS: ${BLOCKS:-1}
+      BLOCK_DAYS: ${BLOCK_DAYS:-30}
+    volumes:
+      - ./:/workspace
+      - ./freqtrade_user_data:/freqtrade/user_data
+    working_dir: /freqtrade
+    command:
+      - bash
+      - -lc
+      - |-
+        set -euo pipefail
+        echo "Running backtest for pairs: ${PAIRS}"
+        bash /workspace/scripts/run_backtest_pairs.sh
+
   # Freqtrade Web UI (FreqUI) to inspect results and interact with the bot
   freqtrade-webui:
     build:

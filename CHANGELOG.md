@@ -20,6 +20,11 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
   - Mirrored regression logic around ATR-adjusted thresholds and EMA200 trend: short when `pred_ret < -(fee_buffer + 0.5*atr_pct)` and `close < ema200`; exit short when the opposite holds.
   - Mirrored classification logic using probability thresholds (0.45/0.55).
 
+## [0.1.28] - 2025-10-04
+### Added
+- feat(compose): Add `freqai-backtest-pairs-gpu-l4` service to backtest arbitrary pairs via env `PAIRS` (comma-separated). Uses a temporary config so your main config stays intact.
+- feat(scripts): `scripts/run_backtest_pairs.sh` — builds a temp whitelist, downloads data, ensures prehistory blocks, and runs backtesting with FreqAI model and GPU.
+
 ## [0.1.25] - 2025-10-03
 ### Performance
 - perf(freqai): Add a fast GPU profile for backtesting/training.
