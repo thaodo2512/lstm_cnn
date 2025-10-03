@@ -1,0 +1,30 @@
+# GPU-enabled Freqtrade image for x86 with NVIDIA (L4)
+# Base on official PyTorch CUDA runtime to ensure GPU acceleration for FreqAI PyTorch models
+FROM pytorch/pytorch:2.3.1-cuda12.1-cudnn8-runtime
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    MPLBACKEND=Agg \
+    TORCH_CUDA_ARCH_LIST=8.9 \
+    PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        git build-essential ca-certificates curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Freqtrade with FreqAI extras (CPU/GPU - PyTorch CUDA provided by base image)
+RUN pip install --no-cache-dir \
+        "freqtrade[freqai,plot]>=2024.8" \
+        numpy pandas scikit-learn matplotlib \
+        ccxt yfinance pandas_datareader ta
+
+WORKDIR /workspace
+
+# Copy repo for PYTHONPATH-based import of our custom FreqAI model
+COPY . /workspace
+
+# Default entrypoint can be overridden by docker-compose
+CMD ["freqtrade", "--help"]
+

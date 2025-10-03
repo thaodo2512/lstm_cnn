@@ -41,6 +41,44 @@ services:
       "--out_dir", "artifacts"
     ]
 
+  # FreqAI training service (uses our HybridTimeseriesFreqAIModel via PYTHONPATH)
+  freqai-train-gpu-l4:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.freqtrade.gpu.x86
+    container_name: freqai_train_gpu_l4
+    gpus: all
+    restart: unless-stopped
+    shm_size: "2g"
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+      TORCH_CUDA_ARCH_LIST: "8.9"
+      PYTHONFAULTHANDLER: "1"
+      PYTHONUNBUFFERED: "1"
+      PYTHONWARNINGS: default
+      MPLBACKEND: Agg
+      FREQAI_DEVICE: cuda
+      PYTHONPATH: /workspace
+      TIMERANGE: ${TIMERANGE:-20240101-20250930}
+    volumes:
+      - ./:/workspace
+      # Mount your freqtrade user_data folder (adjust path as needed)
+      - ../user_data:/freqtrade/user_data
+      # Optional mounts if you keep additional scripts/tools
+      - ../tools:/freqtrade/tools
+      - ../scripts:/freqtrade/scripts
+    working_dir: /freqtrade
+    # Ensure your /freqtrade/user_data/config.json enables FreqAI and references our model:
+    #   "module_path": "hybrid_lstm_transformer_crypto",
+    #   "class_name": "HybridTimeseriesFreqAIModel"
+    # Backtesting will trigger FreqAI training if configured
+    command: [
+      "freqtrade", "backtesting",
+      "--config", "/freqtrade/user_data/config.json",
+      "--timerange", "${TIMERANGE:-20240101-20250930}"
+    ]
+
   # Optional: classification run example (commented). Enable by uncommenting.
   # crypto-train-gpu-l4-cls:
   #   build:
@@ -69,4 +107,3 @@ services:
   #     "--source", "${SOURCE:-auto}",
   #     "--out_dir", "artifacts"
   #   ]
-
