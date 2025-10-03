@@ -20,18 +20,22 @@ if [[ -z "${START_DATE}" || "${START_DATE}" == "${TIMERANGE}" ]]; then
   exit 1
 fi
 
-end_date="${START_DATE}"
+ymd_to_iso() { echo "${1:0:4}-${1:4:2}-${1:6:2}"; }
+iso_to_ymd() { echo "${1//-/}"; }
+
+end_date_iso="$(ymd_to_iso "${START_DATE}")"
 echo "Downloading ${BLOCKS} pre-start blocks of ${BLOCK_DAYS} days ending at ${end_date} for ${TIMEFRAMES}" >&2
 
 for i in $(seq 1 "${BLOCKS}"); do
-  start_date=$(date -u -d "${end_date} - ${BLOCK_DAYS} day" +%Y%m%d)
+  start_date_iso=$(date -u -d "${end_date_iso} - ${BLOCK_DAYS} days" +%Y-%m-%d)
+  start_date="$(iso_to_ymd "${start_date_iso}")"
+  end_date="$(iso_to_ymd "${end_date_iso}")"
   echo "-> Pre-block ${i}: ${start_date}-${end_date}" >&2
   freqtrade download-data \
     --config "${CONFIG_PATH}" \
     --timeframes ${TIMEFRAMES} \
     --timerange "${start_date}-${end_date}"
-  end_date="${start_date}"
+  end_date_iso="${start_date_iso}"
 done
 
 echo "Pre-start block downloads complete." >&2
-

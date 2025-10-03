@@ -70,6 +70,10 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 ### Changed
 - freqai(compose): Always download the full `TIMERANGE` and then pre-start blocks based on `BLOCKS`/`BLOCK_DAYS` (default `BLOCKS=3`) to guarantee coverage before training.
 
+## [0.1.18] - 2025-10-03
+### Fixed
+- scripts: Robust date math for block downloaders — convert YYYYMMDD to ISO (YYYY-MM-DD) before `date -d` operations to ensure correct ranges on Ubuntu base images.
+
 ## [0.1.2] - 2025-10-03
 ### Changed
 - `scripts/setup_nvidia_l4_cuda_docker_ubuntu.sh`: Switch installer to `INSTALL_MODE=binary` for LTS branch (535) and update notes.

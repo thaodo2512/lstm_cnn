@@ -14,20 +14,25 @@ BLOCK_DAYS="${5:-30}"
 
 echo "Downloading data in ${BLOCK_DAYS}-day blocks from ${START_DATE} to ${END_DATE} for timeframes: ${TIMEFRAMES}" >&2
 
-current="${START_DATE}"
+ymd_to_iso() { echo "${1:0:4}-${1:4:2}-${1:6:2}"; }
+iso_to_ymd() { echo "${1//-/}"; }
+
+current_iso="$(ymd_to_iso "${START_DATE}")"
 while [[ "${current}" < "${END_DATE}" ]]; do
-  next=$(date -u -d "${current} +${BLOCK_DAYS} day" +%Y%m%d)
+  next_iso=$(date -u -d "${current_iso} +${BLOCK_DAYS} days" +%Y-%m-%d)
+  next="$(iso_to_ymd "${next_iso}")"
   if [[ "${next}" > "${END_DATE}" ]]; then
     next="${END_DATE}"
+    next_iso="$(ymd_to_iso "${next}")"
   fi
-  echo "-> Block: ${current}-${next}" >&2
+  cur_ymd="$(iso_to_ymd "${current_iso}")"
+  echo "-> Block: ${cur_ymd}-${next}" >&2
   freqtrade download-data \
     --config "${CONFIG_PATH}" \
     --timeframes ${TIMEFRAMES} \
-    --timerange "${current}-${next}"
+    --timerange "${cur_ymd}-${next}"
 
-  current="${next}"
+  current_iso="${next_iso}"
 done
 
 echo "Download blocks complete." >&2
-
