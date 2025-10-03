@@ -6,6 +6,7 @@
   "timeframe": "1h",
   "dry_run": true,
   "strategy": "FreqAIHybridExample",
+  "freqaimodel": "HybridTimeseriesFreqAIModel_tinhn",
   "exchange": {
     "name": "binance",
     "key": "",
