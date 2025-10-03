@@ -13,7 +13,7 @@ CONFIG_TMP=${CONFIG_TMP:-/tmp/config_pairs_trade.json}
 echo "Pairs: $PAIRS_CSV  Strategy: $STRATEGY  Model: $FREQAIMODEL"
 
 # Build temporary config with custom whitelist (avoid editing main config)
-PAIRS_CSV_EXPORT="$PAIRS_CSV" python - <<'PY'
+CONFIG_IN="$CONFIG_IN" CONFIG_TMP="$CONFIG_TMP" PAIRS="$PAIRS_CSV" python - <<'PY'
 import json, os, sys
 src = os.environ.get('CONFIG_IN')
 dst = os.environ.get('CONFIG_TMP')

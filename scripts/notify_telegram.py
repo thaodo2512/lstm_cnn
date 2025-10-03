@@ -27,7 +27,7 @@ def main() -> None:
     ap.add_argument("--chat-id", default=os.environ.get("TELEGRAM_CHAT_ID", ""))
     args = ap.parse_args()
 
-    if not args.token or not args["chat_id"] if isinstance(args, dict) else not args.chat_id:
+    if not args.token or not args.chat_id:
         print("Missing Telegram token/chat-id. Skipping notification.")
         return
 
@@ -63,4 +63,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
