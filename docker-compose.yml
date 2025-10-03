@@ -69,7 +69,7 @@ services:
       TIMERANGE: ${TIMERANGE:-20240101-20250930}
       # Block download config
       TIMEFRAMES: ${TIMEFRAMES:-1h}
-      BLOCKS: ${BLOCKS:-2}
+      BLOCKS: ${BLOCKS:-3}
       BLOCK_DAYS: ${BLOCK_DAYS:-30}
     volumes:
       - ./:/workspace

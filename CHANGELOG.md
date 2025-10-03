@@ -68,7 +68,7 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 ### Added
 - scripts: `scripts/freqtrade_download_prestart_blocks.sh` — downloads N×block_days ending at the backtest start (from `TIMERANGE`) to ensure FreqAI has pre-history for training.
 ### Changed
-- freqai(compose): Always download the full `TIMERANGE` and then pre-start blocks based on `BLOCKS`/`BLOCK_DAYS` to guarantee coverage before training.
+- freqai(compose): Always download the full `TIMERANGE` and then pre-start blocks based on `BLOCKS`/`BLOCK_DAYS` (default `BLOCKS=3`) to guarantee coverage before training.
 
 ## [0.1.2] - 2025-10-03
 ### Changed
