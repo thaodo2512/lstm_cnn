@@ -24,6 +24,10 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 ### Fixed
 - freqai(compose): Simplify command to single-line `bash -lc` without line-continuation to avoid YAML folding issues causing `--config`/`&&` parsing errors.
 
+## [0.1.9] - 2025-10-03
+### Fixed
+- freqai(imports): Import `BasePyTorchModel` from `freqtrade.freqai.base_models.BasePyTorchModel` to avoid subclassing the module object, fixing `TypeError: module() takes at most 2 arguments (3 given)` during FreqAI model class definition.
+
 ## [0.1.2] - 2025-10-03
 ### Changed
 - `scripts/setup_nvidia_l4_cuda_docker_ubuntu.sh`: Switch installer to `INSTALL_MODE=binary` for LTS branch (535) and update notes.

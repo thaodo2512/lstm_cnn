@@ -822,7 +822,8 @@ def plot_attention_heatmap(attn: torch.Tensor, out_path: str) -> None:
 # ---------------------------------------------
 
 try:
-    from freqtrade.freqai.base_models import BasePyTorchModel  # type: ignore
+    # Import BasePyTorchModel class explicitly (not the module) for correct subclassing
+    from freqtrade.freqai.base_models.BasePyTorchModel import BasePyTorchModel  # type: ignore
     from freqtrade.freqai.data_kitchen import FreqaiDataKitchen  # type: ignore
 except Exception:
     class BasePyTorchModel:  # type: ignore
