@@ -61,6 +61,7 @@ class FreqAIHybridImproved5mShort(IStrategy):
 
     rsi_threshold = IntParameter(50, 58, default=52, space="buy")  # a bit stricter
     pred_ema_span = IntParameter(3, 9, default=5, space="buy")
+    pred_mult_long = DecimalParameter(1.25, 1.75, default=1.50, decimals=2, space="buy")
 
     k_atr = DecimalParameter(0.30, 1.20, default=0.60, decimals=2, space="buy")
     k_exit_atr = DecimalParameter(0.5, 2.0, default=0.70, decimals=2, space="sell")
@@ -68,6 +69,7 @@ class FreqAIHybridImproved5mShort(IStrategy):
 
     fee_buffer = DecimalParameter(0.0008, 0.0020, default=0.0012, decimals=4, space="buy")
     min_pred_move = DecimalParameter(0.0020, 0.0040, default=0.0030, decimals=4, space="buy")
+    atr_ok_min_pct = DecimalParameter(0.0010, 0.0030, default=0.0015, decimals=4, space="buy")
 
     prob_up_gate = DecimalParameter(0.60, 0.72, default=0.66, decimals=2, space="buy")
     prob_down_gate = DecimalParameter(0.60, 0.72, default=0.66, decimals=2, space="sell")
@@ -181,8 +183,12 @@ class FreqAIHybridImproved5mShort(IStrategy):
         atr_5m = self._atr(dataframe, 14)
         dataframe["atr_pct"] = (atr_5m / dataframe["close"]).replace([np.inf, -np.inf], np.nan).fillna(0.0)
         dataframe["thr"] = float(self.fee_buffer.value) + float(self.k_atr.value) * dataframe["atr_pct"]
-        # Chop filter: require some volatility
-        dataframe["atr_ok"] = dataframe["atr_pct"] > 0.003
+        # Chop filter: require some volatility (hyperoptable floor)
+        try:
+            atr_floor = float(self.atr_ok_min_pct.value)  # type: ignore[attr-defined]
+        except Exception:
+            atr_floor = 0.0015
+        dataframe["atr_ok"] = dataframe["atr_pct"] > atr_floor
         dataframe["gate_mag"] = dataframe["pred_ret_ema"].abs()
 
         # 1h regime and buffers
@@ -279,7 +285,7 @@ class FreqAIHybridImproved5mShort(IStrategy):
         # Stricter entry: require prediction to exceed threshold by 75% and min magnitude
         cond_long = (
             (dataframe["do_pred"] == 1)
-            & (dataframe["pred_ret_ema"] > 1.75 * dataframe["thr"])
+            & (dataframe["pred_ret_ema"] > float(self.pred_mult_long.value) * dataframe["thr"])
             & (dataframe["gate_mag"] > float(self.min_pred_move.value))
             & (dataframe["rsi_1h"] > int(self.rsi_threshold.value))
             & (dataframe["regime_long"])
