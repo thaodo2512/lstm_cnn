@@ -263,23 +263,14 @@ class ichiV1(IStrategy):
                     dataframe[ocol] = _ema(dataframe["open"], p)
 
         # Fan magnitude and acceleration (safe if columns were just created)
-        # Use nearest available periods to defaults fast=12, slow=96
-        def _nearest(target: int, avail: list[int]) -> int:
-            if target in avail:
-                return target
-            return min(avail, key=lambda x: abs(x - target)) if avail else target
-
-        p_fast = _nearest(12, periods)
-        p_slow = _nearest(96, periods)
-        # Avoid identical periods (choose max as slow, min as fast)
-        if p_fast == p_slow and periods:
-            p_fast = min(periods)
-            p_slow = max(periods)
-        fast_col = f"%%-trend_close_period_{p_fast}"
-        slow_col = f"%%-trend_close_period_{p_slow}"
+        # Always compute canonical fast=12 and slow=96 to avoid degenerate fm==1.0
+        for need in (12, 96):
+            ccol = f"%%-trend_close_period_{need}"
+            if ccol not in dataframe.columns:
+                dataframe[ccol] = _ema(dataframe["close"], need)
         # Guard against zero/NaN denominator
-        den = dataframe[slow_col].replace(0, 1e-8)
-        dataframe["%%-fan_magnitude"] = dataframe[fast_col] / den
+        den = dataframe["%%-trend_close_period_96"].replace(0, 1e-8)
+        dataframe["%%-fan_magnitude"] = dataframe["%%-trend_close_period_12"] / den
         dataframe["%%-fan_magnitude_gain"] = (
             dataframe["%%-fan_magnitude"] / dataframe["%%-fan_magnitude"].shift(1)
         )
