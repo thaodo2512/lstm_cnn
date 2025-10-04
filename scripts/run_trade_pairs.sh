@@ -38,11 +38,17 @@ PY
 
 echo "Pre-downloading data for ${TIMEFRAMES} ${TIMERANGE} ..."
 freqtrade list-data --config "$CONFIG_TMP" --show-timerange || true
-freqtrade download-data --config "$CONFIG_TMP" -t "$TIMEFRAMES" --timerange "$TIMERANGE" || true
+# Split TIMEFRAMES (comma or space separated) and download each individually
+TF_INPUT="${TIMEFRAMES:-1h}"
+for tf in $(echo "$TF_INPUT" | tr ',' ' '); do
+  tf=$(echo "$tf" | xargs)
+  [[ -z "$tf" ]] && continue
+  echo "-> Downloading timeframe: $tf"
+  freqtrade download-data --config "$CONFIG_TMP" -t "$tf" --timerange "$TIMERANGE" || true
+done
 
 echo "Starting Freqtrade dry-run with Telegram (if configured) ..."
 exec freqtrade trade \
   --config "$CONFIG_TMP" \
   --strategy "$STRATEGY" \
-  --freqaimodel "$FREQAIMODEL" \
-  --loglevel DEBUG
+  --freqaimodel "$FREQAIMODEL"
