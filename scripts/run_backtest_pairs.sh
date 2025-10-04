@@ -40,18 +40,18 @@ echo "Listing available data (pre-download)..."
 freqtrade list-data --config "$CONFIG_TMP" --show-timerange || true
 
 echo "Downloading backtest data for $PAIRS_CSV ..."
-# Build multiple -t args from TIMEFRAMES (supports comma or space separated)
+# Build TF list from TIMEFRAMES (supports comma or space separated)
 TF_INPUT="${TIMEFRAMES:-1h}"
 TF_LIST=()
 for tf in $(echo "$TF_INPUT" | tr ',' ' '); do
   tf=$(echo "$tf" | xargs)
   [[ -n "$tf" ]] && TF_LIST+=("$tf")
 done
-TF_ARGS=()
+# Call download-data separately per timeframe to avoid CLI collapsing issues
 for tf in "${TF_LIST[@]}"; do
-  TF_ARGS+=("-t" "$tf")
+  echo "-> Downloading timeframe: $tf"
+  freqtrade download-data --config "$CONFIG_TMP" -t "$tf" --timerange "$TIMERANGE" || true
 done
-freqtrade download-data --config "$CONFIG_TMP" ${TF_ARGS[@]} --timerange "$TIMERANGE"
 
 echo "Ensuring pre-start history for FreqAI (optional)..."
 for tf in "${TF_LIST[@]}"; do
