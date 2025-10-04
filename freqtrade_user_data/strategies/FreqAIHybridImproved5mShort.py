@@ -376,20 +376,51 @@ class FreqAIHybridImproved5mShort(IStrategy):
         current_profit: float,
         **kwargs: Any,
     ) -> Optional[float]:
-        """Dynamic ATR-like hard stop, plus breakeven raise after half horizon.
+        """Fixed hard stop with ATR anchor (if available) + breakeven raise.
 
-        Uses a conservative floor (0.6%) scaled by k_sl_atr. If trade is
-        profitable after half of label horizon, raise stop to ~-0.2%.
+        - Uses a conservative floor (0.6%) scaled by `k_sl_atr`.
+        - If an ATR% snapshot was stored at entry time, anchors stoploss to it.
+        - If trade is profitable after half of label horizon, raise stop to ~-0.2%.
         """
-        sl_floor = 0.006
-        atr_scaled = float(self.k_sl_atr.value) * sl_floor
-        sl_now = max(sl_floor, atr_scaled)
+        sl_floor = 0.006  # 0.6%
+        # Try dynamic ATR% anchored at entry, falling back to floor
+        entry_atr_pct = None
+        try:
+            entry_atr_pct = float(self.custom_info.get("entry_atr_pct", {}).get(pair))
+        except Exception:
+            entry_atr_pct = None
+        base = entry_atr_pct if entry_atr_pct is not None else sl_floor
+        sl_now = max(sl_floor, float(self.k_sl_atr.value) * base)
 
         lp = int(self.freqai_info.get("feature_parameters", {}).get("label_period_candles", 24))
         age = (current_time - trade.open_date_utc).total_seconds() / 300.0  # 5m candles
         if age >= 0.5 * lp and current_profit > 0:
             return -0.002  # ~ -0.2%
         return -sl_now
+
+    # Capture ATR% snapshot at entry time for dynamic stoploss anchoring
+    def confirm_trade_entry(
+        self,
+        pair: str,
+        order_type: str,
+        amount: float,
+        rate: float,
+        time_in_force: str,
+        current_time: datetime,
+        entry_tag: Optional[str] = None,
+        side: Optional[str] = None,
+        **kwargs: Any,
+    ) -> Tuple[bool, str, float, float, str]:
+        try:
+            if self.dp:
+                df = self.dp.get_pair_dataframe(pair=pair, timeframe=self.timeframe)
+                if len(df) > 0:
+                    atr = self._atr(df, 14)
+                    atr_pct = float((atr.iloc[-1] / df["close"].iloc[-1])) if atr is not None else 0.0
+                    self.custom_info.setdefault("entry_atr_pct", {})[pair] = atr_pct
+        except Exception:
+            pass
+        return True, order_type, amount, rate, time_in_force
 
     # --------- FreqAI hooks ---------
     def set_freqai_targets(self, dataframe: DataFrame, metadata: Dict[str, Any], **kwargs: Any) -> DataFrame:
