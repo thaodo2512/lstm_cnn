@@ -45,16 +45,17 @@ class ichiV1(IStrategy):
         "sell_trend_indicator": "trend_close_2h",
     }
 
-    # ROI table
+    # ROI table (trend-following, avoid fast decay to ~0)
     minimal_roi = {
-        "0": 0.059,
-        "10": 0.037,
-        "41": 0.012,
-        "114": 0,
+        # Keep some profit expectation early, decay slowly over hours/days
+        "0": 0.02,     # 2.0% immediately
+        "360": 0.012,  # after 6h
+        "1440": 0.004, # after 24h
+        "4320": 0.0,   # after 3d
     }
 
-    # Stoploss
-    stoploss = -0.275
+    # Stoploss (tighten to cap downside; trailing will manage winners)
+    stoploss = -0.03
 
     # Optimal timeframe for the strategy
     timeframe = "5m"
@@ -63,16 +64,18 @@ class ichiV1(IStrategy):
     # FreqAI requires new-candle processing in live mode
     process_only_new_candles = True
 
-    trailing_stop = False
-    # trailing_stop_positive = 0.002
-    # trailing_stop_positive_offset = 0.025
-    # trailing_only_offset_is_reached = True
+    trailing_stop = True
+    trailing_stop_positive = 0.004
+    trailing_stop_positive_offset = 0.012
+    trailing_only_offset_is_reached = True
 
     use_exit_signal = True
-    exit_profit_only = False
+    # Let ROI/trailing govern profit-taking, avoid early losses via exit_signal
+    exit_profit_only = True
     ignore_roi_if_entry_signal = False
     # Enable shorting (requires futures-capable exchange/config)
-    can_short: bool = True
+    # Disabled by default; can re-enable via env gates below
+    can_short: bool = False
 
     trend_period_map = {
         "trend_close_5m": 1,
@@ -382,14 +385,36 @@ class ichiV1(IStrategy):
                 sell_indicator, self.trend_period_map[self.sell_params["sell_trend_indicator"]]
             )
         )
-        cond = qtpylib.crossed_below(
+
+        # EMA trend cross (legacy)
+        ema_cross_down = qtpylib.crossed_below(
             df["%%-trend_close_period_1"], df[f"%%-trend_close_period_{period}"]
         )
-        df.loc[cond.fillna(False), "exit_long"] = 1
-        # Short exit (optional via ICHI_ENABLE_SHORT): crossed above inverse
+
+        # Ichimoku exits: Tenkan crosses below Kijun OR close below Kijun
+        tenkan = df.get("%%-tenkan_sen")
+        kijun = df.get("%%-kijun_sen")
+        ichi_cross_down = (
+            qtpylib.crossed_below(tenkan, kijun) if tenkan is not None and kijun is not None else pd.Series(False, index=df.index)
+        )
+        close_below_kijun = (
+            (df["close"] < kijun) if kijun is not None else pd.Series(False, index=df.index)
+        )
+
+        cond_long = (ema_cross_down | ichi_cross_down | close_below_kijun)
+        df.loc[cond_long.fillna(False), "exit_long"] = 1
+
+        # Short exit (optional via ICHI_ENABLE_SHORT): crossed above inverses
         if self._env_bool("ICHI_ENABLE_SHORT", True):
-            cond_s = qtpylib.crossed_above(
+            ema_cross_up = qtpylib.crossed_above(
                 df["%%-trend_close_period_1"], df[f"%%-trend_close_period_{period}"]
             )
-            df.loc[cond_s.fillna(False), "exit_short"] = 1
+            ichi_cross_up = (
+                qtpylib.crossed_above(tenkan, kijun) if tenkan is not None and kijun is not None else pd.Series(False, index=df.index)
+            )
+            close_above_kijun = (
+                (df["close"] > kijun) if kijun is not None else pd.Series(False, index=df.index)
+            )
+            cond_short = (ema_cross_up | ichi_cross_up | close_above_kijun)
+            df.loc[cond_short.fillna(False), "exit_short"] = 1
         return df
