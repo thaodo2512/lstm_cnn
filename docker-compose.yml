@@ -137,6 +137,10 @@ services:
       ICHI_TEST_LOOSE: ${ICHI_TEST_LOOSE:-false}
       ICHI_TEST_THR: ${ICHI_TEST_THR:-0.0}
       ICHI_SELL_TREND: ${ICHI_SELL_TREND:-trend_close_2h}
+      # Debug exports
+      FREQAI_DEBUG_EXPORT: ${FREQAI_DEBUG_EXPORT:-false}
+      ICHI_DEBUG_EXPORT: ${ICHI_DEBUG_EXPORT:-false}
+      ICHI_DEBUG_MAX_ROWS: ${ICHI_DEBUG_MAX_ROWS:-0}
     volumes:
       - ./:/workspace
       - ./freqtrade_user_data:/freqtrade/user_data
@@ -200,6 +204,10 @@ services:
       ICHI_TEST_LOOSE: ${ICHI_TEST_LOOSE:-false}
       ICHI_TEST_THR: ${ICHI_TEST_THR:-0.0}
       ICHI_SELL_TREND: ${ICHI_SELL_TREND:-trend_close_2h}
+      # Debug exports
+      FREQAI_DEBUG_EXPORT: ${FREQAI_DEBUG_EXPORT:-false}
+      ICHI_DEBUG_EXPORT: ${ICHI_DEBUG_EXPORT:-false}
+      ICHI_DEBUG_MAX_ROWS: ${ICHI_DEBUG_MAX_ROWS:-0}
     volumes:
       - ./:/workspace
       - ./freqtrade_user_data:/freqtrade/user_data

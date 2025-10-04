@@ -436,4 +436,78 @@ class ichiV1(IStrategy):
             )
             cond_short = (ema_cross_up | ichi_cross_up | close_above_kijun)
             df.loc[cond_short.fillna(False), "exit_short"] = 1
+        # Optional debug export for inspection
+        self._maybe_debug_export(df, metadata)
         return df
+
+    # ---------------- Debug helpers ----------------
+    @staticmethod
+    def _safe_name(text: str) -> str:
+        try:
+            return "".join(c if c.isalnum() or c in ("-", "_") else "_" for c in str(text))
+        except Exception:
+            return "unknown"
+
+    _debug_written_keys: set = set()
+
+    def _maybe_debug_export(self, dataframe: DataFrame, metadata: dict) -> None:
+        """If ICHI_DEBUG_EXPORT=true, write a compact CSV with predictions, gates, and
+        final signals to /freqtrade/user_data/backtest_results.
+        """
+        flag = os.getenv("ICHI_DEBUG_EXPORT", "").strip().lower()
+        if flag not in {"1", "true", "yes", "on"}:
+            return
+        try:
+            pair = metadata.get("pair", "unknown_pair")
+            timeframe = getattr(self, "timeframe", "tf")
+            key = f"{pair}|{timeframe}"
+            # Write once per pair/timeframe per run
+            if key in self._debug_written_keys:
+                return
+
+            cols = []
+            # price/volume
+            cols += [c for c in ["open", "high", "low", "close", "volume"] if c in dataframe.columns]
+            # predictions
+            cols += [c for c in ["&-s_close", "&-s_close_mean", "&-s_close_std", "target_roi", "do_predict"] if c in dataframe.columns]
+            # ichimoku
+            cols += [c for c in [
+                "%-pct-change",
+                "%%-tenkan_sen", "%%-kijun_sen", "%%-senkou_a", "%%-senkou_b",
+                "%%-cloud_green", "%%-cloud_red",
+            ] if c in dataframe.columns]
+            # trend / fan
+            for p in [1,3,6,12,24,48,72,96]:
+                tc = f"%%-trend_close_period_{p}"
+                to = f"%%-trend_open_period_{p}"
+                if tc in dataframe.columns: cols.append(tc)
+                if to in dataframe.columns: cols.append(to)
+            cols += [c for c in ["%%-fan_magnitude", "%%-fan_magnitude_gain"] if c in dataframe.columns]
+            # signals
+            cols += [c for c in ["enter_long", "enter_short", "exit_long", "exit_short"] if c in dataframe.columns]
+
+            debug_df = dataframe[cols].copy() if cols else dataframe.copy()
+
+            # Limit rows if requested
+            try:
+                max_rows = int(os.getenv("ICHI_DEBUG_MAX_ROWS", "0"))
+            except Exception:
+                max_rows = 0
+            if max_rows and len(debug_df) > max_rows:
+                debug_df = debug_df.tail(max_rows)
+
+            from pathlib import Path
+            out_dir = Path("/freqtrade/user_data/backtest_results")
+            out_dir.mkdir(parents=True, exist_ok=True)
+            pair_s = self._safe_name(pair)
+            tf_s = self._safe_name(timeframe)
+            start = debug_df.index.min()
+            end = debug_df.index.max()
+            start_s = self._safe_name(str(start)[:19].replace(" ", "T")) if start is not None else "start"
+            end_s = self._safe_name(str(end)[:19].replace(" ", "T")) if end is not None else "end"
+            out_path = out_dir / f"ichi_debug_{pair_s}_{tf_s}_{start_s}_{end_s}.csv"
+            debug_df.to_csv(out_path)
+            self._debug_written_keys.add(key)
+        except Exception:
+            # Never interrupt strategy execution due to debugging
+            return

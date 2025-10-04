@@ -1262,6 +1262,8 @@ class HybridTimeseriesFreqAIModel_tinhn(BasePyTorchRegressor):  # type: ignore
             else:
                 columns = label_columns or ["&-prediction"]
                 pred_df = pd.DataFrame(np.zeros((total_len, len(columns)), dtype=np.float32), columns=columns, index=feature_df.index)
+            # Optional debug export even if no full window size is available
+            self._maybe_debug_dump(unfiltered_df, pred_df, dk)
             return pred_df, dk.do_predict
 
         # Placeholder labels just to reuse the window builder and keep indices
@@ -1320,6 +1322,8 @@ class HybridTimeseriesFreqAIModel_tinhn(BasePyTorchRegressor):  # type: ignore
                 pred_df = pd.DataFrame({column_name: full_series.values}, index=feature_df.index)
             else:
                 pred_df = pd.DataFrame({column_name: full_vals}, index=feature_df.index)
+            # Optional debug export
+            self._maybe_debug_dump(unfiltered_df, pred_df, dk)
             return pred_df, dk.do_predict
         else:
             # Inverse model-specific scaler first (second stage)
@@ -1343,7 +1347,61 @@ class HybridTimeseriesFreqAIModel_tinhn(BasePyTorchRegressor):  # type: ignore
                 # If label pipeline not available, keep current scale
                 pass
 
+            # Optional debug export
+            self._maybe_debug_dump(unfiltered_df, pred_df, dk)
             return pred_df, dk.do_predict
+
+    # --- Debug helpers -----------------------------------------------------
+    @staticmethod
+    def _safe_name(text: str) -> str:
+        try:
+            return "".join(c if c.isalnum() or c in ("-", "_") else "_" for c in str(text))
+        except Exception:
+            return "unknown"
+
+    def _maybe_debug_dump(self, unfiltered_df: pd.DataFrame, pred_df: pd.DataFrame, dk: FreqaiDataKitchen) -> None:
+        """When FREQAI_DEBUG_EXPORT is truthy, write a CSV joining OHLCV, predictions,
+        and do_predict/DI_values for easier debugging after backtests.
+
+        Output: /freqtrade/user_data/backtest_results/freqai_pred_debug_<pair>_<tf>_<start>_<end>.csv
+        """
+        flag = os.getenv("FREQAI_DEBUG_EXPORT", "").strip().lower()
+        if flag not in {"1", "true", "yes", "on"}:
+            return
+        try:
+            # Resolve identifiers
+            pair = getattr(dk, "pair", None) or getattr(dk, "pair_name", None) or getattr(dk, "pair_id", None)
+            timeframe = getattr(dk, "timeframe", None) or getattr(dk, "base_timeframe", None)
+            pair_s = self._safe_name(pair or "unknown_pair")
+            tf_s = self._safe_name(timeframe or getattr(self, "timeframe", "tf"))
+
+            # Build dataframe
+            base_cols = [c for c in ["open", "high", "low", "close", "volume"] if c in unfiltered_df.columns]
+            dbg = pd.DataFrame(index=pred_df.index)
+            if base_cols:
+                dbg[base_cols] = unfiltered_df.reindex(pred_df.index)[base_cols]
+            # Attach predictions and masks
+            for c in pred_df.columns:
+                dbg[c] = pred_df[c]
+            do_pred = getattr(dk, "do_predict", None)
+            if do_pred is not None and len(do_pred) == len(dbg):
+                dbg["do_predict"] = do_pred
+            di_vals = getattr(dk, "DI_values", None)
+            if di_vals is not None and len(di_vals) == len(dbg):
+                dbg["DI_values"] = di_vals
+
+            # Path and write
+            out_dir = Path("/freqtrade/user_data/backtest_results")
+            out_dir.mkdir(parents=True, exist_ok=True)
+            start = dbg.index.min()
+            end = dbg.index.max()
+            start_s = self._safe_name(str(start)[:19].replace(" ", "T")) if start is not None else "start"
+            end_s = self._safe_name(str(end)[:19].replace(" ", "T")) if end is not None else "end"
+            out_path = out_dir / f"freqai_pred_debug_{pair_s}_{tf_s}_{start_s}_{end_s}.csv"
+            dbg.to_csv(out_path)
+        except Exception:
+            # Never let debugging fail the pipeline
+            pass
 
 
 FREQAI_CONFIG_SNIPPET = """
