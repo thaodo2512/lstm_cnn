@@ -108,14 +108,14 @@ class ichiV1(IStrategy):
             },
             # plot senkou_b, too. Not only the area to it.
             "%%-senkou_b": {},
-            "%%-trend_close-period_1": {"color": "#FF5733"},
-            "%%-trend_close-period_3": {"color": "#FF8333"},
-            "%%-trend_close-period_6": {"color": "#FFB533"},
-            "%%-trend_close-period_12": {"color": "#FFE633"},
-            "%%-trend_close-period_24": {"color": "#E3FF33"},
-            "%%-trend_close-period_48": {"color": "#C4FF33"},
-            "%%-trend_close-period_72": {"color": "#61FF33"},
-            "%%-trend_close-period_96": {"color": "#33FF7D"},
+            "%%-trend_close_period_1": {"color": "#FF5733"},
+            "%%-trend_close_period_3": {"color": "#FF8333"},
+            "%%-trend_close_period_6": {"color": "#FFB533"},
+            "%%-trend_close_period_12": {"color": "#FFE633"},
+            "%%-trend_close_period_24": {"color": "#E3FF33"},
+            "%%-trend_close_period_48": {"color": "#C4FF33"},
+            "%%-trend_close_period_72": {"color": "#61FF33"},
+            "%%-trend_close_period_96": {"color": "#33FF7D"},
         },
         "subplots": {
             "fan_magnitude": {"%%-fan_magnitude": {}},
@@ -127,9 +127,14 @@ class ichiV1(IStrategy):
     def feature_engineering_expand_all(
         self, dataframe: DataFrame, period: int, metadata: dict, **kwargs
     ) -> DataFrame:
-        dataframe["%%-trend_close-period"] = ta.EMA(dataframe["close"], timeperiod=period)
-        dataframe["%%-trend_open-period"] = ta.EMA(dataframe["open"], timeperiod=period)
-        dataframe["%%-atr-period"] = ta.ATR(dataframe, timeperiod=period)
+        # Write explicit period-suffixed columns to avoid naming ambiguity across periods
+        dataframe[f"%%-trend_close_period_{period}"] = ta.EMA(
+            dataframe["close"], timeperiod=period
+        )
+        dataframe[f"%%-trend_open_period_{period}"] = ta.EMA(
+            dataframe["open"], timeperiod=period
+        )
+        dataframe[f"%%-atr_period_{period}"] = ta.ATR(dataframe, timeperiod=period)
         return dataframe
 
     def feature_engineering_expand_basic(
@@ -172,16 +177,25 @@ class ichiV1(IStrategy):
                 return series.ewm(span=max(1, n), adjust=False).mean()
 
         for p in [1, 3, 6, 12, 24, 48, 72, 96]:
-            ccol = f"%%-trend_close-period_{p}"
-            ocol = f"%%-trend_open-period_{p}"
+            # Prefer underscore naming; also support legacy hyphen names by aliasing
+            ccol = f"%%-trend_close_period_{p}"
+            ocol = f"%%-trend_open_period_{p}"
             if ccol not in dataframe.columns:
-                dataframe[ccol] = _ema(dataframe["close"], p)
+                legacy = f"%%-trend_close-period_{p}"
+                if legacy in dataframe.columns:
+                    dataframe[ccol] = dataframe[legacy]
+                else:
+                    dataframe[ccol] = _ema(dataframe["close"], p)
             if ocol not in dataframe.columns:
-                dataframe[ocol] = _ema(dataframe["open"], p)
+                legacy = f"%%-trend_open-period_{p}"
+                if legacy in dataframe.columns:
+                    dataframe[ocol] = dataframe[legacy]
+                else:
+                    dataframe[ocol] = _ema(dataframe["open"], p)
 
         # Fan magnitude and acceleration (safe if columns were just created)
         dataframe["%%-fan_magnitude"] = (
-            dataframe["%%-trend_close-period_12"] / dataframe["%%-trend_close-period_96"]
+            dataframe["%%-trend_close_period_12"] / dataframe["%%-trend_close_period_96"]
         )
         dataframe["%%-fan_magnitude_gain"] = (
             dataframe["%%-fan_magnitude"] / dataframe["%%-fan_magnitude"].shift(1)
@@ -235,48 +249,48 @@ class ichiV1(IStrategy):
         # Trending market above cloud
         level = int(self.buy_params["buy_trend_above_senkou_level"])
         if level >= 1:
-            conditions.append(df["%%-trend_close-period_1"] > df["%%-senkou_a"])
-            conditions.append(df["%%-trend_close-period_1"] > df["%%-senkou_b"])
+            conditions.append(df["%%-trend_close_period_1"] > df["%%-senkou_a"])
+            conditions.append(df["%%-trend_close_period_1"] > df["%%-senkou_b"])
         if level >= 2:
-            conditions.append(df["%%-trend_close-period_3"] > df["%%-senkou_a"])
-            conditions.append(df["%%-trend_close-period_3"] > df["%%-senkou_b"])
+            conditions.append(df["%%-trend_close_period_3"] > df["%%-senkou_a"])
+            conditions.append(df["%%-trend_close_period_3"] > df["%%-senkou_b"])
         if level >= 3:
-            conditions.append(df["%%-trend_close-period_6"] > df["%%-senkou_a"])
-            conditions.append(df["%%-trend_close-period_6"] > df["%%-senkou_b"])
+            conditions.append(df["%%-trend_close_period_6"] > df["%%-senkou_a"])
+            conditions.append(df["%%-trend_close_period_6"] > df["%%-senkou_b"])
         if level >= 4:
-            conditions.append(df["%%-trend_close-period_12"] > df["%%-senkou_a"])
-            conditions.append(df["%%-trend_close-period_12"] > df["%%-senkou_b"])
+            conditions.append(df["%%-trend_close_period_12"] > df["%%-senkou_a"])
+            conditions.append(df["%%-trend_close_period_12"] > df["%%-senkou_b"])
         if level >= 5:
-            conditions.append(df["%%-trend_close-period_24"] > df["%%-senkou_a"])
-            conditions.append(df["%%-trend_close-period_24"] > df["%%-senkou_b"])
+            conditions.append(df["%%-trend_close_period_24"] > df["%%-senkou_a"])
+            conditions.append(df["%%-trend_close_period_24"] > df["%%-senkou_b"])
         if level >= 6:
-            conditions.append(df["%%-trend_close-period_48"] > df["%%-senkou_a"])
-            conditions.append(df["%%-trend_close-period_48"] > df["%%-senkou_b"])
+            conditions.append(df["%%-trend_close_period_48"] > df["%%-senkou_a"])
+            conditions.append(df["%%-trend_close_period_48"] > df["%%-senkou_b"])
         if level >= 7:
-            conditions.append(df["%%-trend_close-period_72"] > df["%%-senkou_a"])
-            conditions.append(df["%%-trend_close-period_72"] > df["%%-senkou_b"])
+            conditions.append(df["%%-trend_close_period_72"] > df["%%-senkou_a"])
+            conditions.append(df["%%-trend_close_period_72"] > df["%%-senkou_b"])
         if level >= 8:
-            conditions.append(df["%%-trend_close-period_96"] > df["%%-senkou_a"])
-            conditions.append(df["%%-trend_close-period_96"] > df["%%-senkou_b"])
+            conditions.append(df["%%-trend_close_period_96"] > df["%%-senkou_a"])
+            conditions.append(df["%%-trend_close_period_96"] > df["%%-senkou_b"])
 
         # Trends bullish (close EMA above open EMA)
         bull_level = int(self.buy_params["buy_trend_bullish_level"])
         if bull_level >= 1:
-            conditions.append(df["%%-trend_close-period_1"] > df["%%-trend_open-period_1"])
+            conditions.append(df["%%-trend_close_period_1"] > df["%%-trend_open_period_1"])
         if bull_level >= 2:
-            conditions.append(df["%%-trend_close-period_3"] > df["%%-trend_open-period_3"])
+            conditions.append(df["%%-trend_close_period_3"] > df["%%-trend_open_period_3"])
         if bull_level >= 3:
-            conditions.append(df["%%-trend_close-period_6"] > df["%%-trend_open-period_6"])
+            conditions.append(df["%%-trend_close_period_6"] > df["%%-trend_open_period_6"])
         if bull_level >= 4:
-            conditions.append(df["%%-trend_close-period_12"] > df["%%-trend_open-period_12"])
+            conditions.append(df["%%-trend_close_period_12"] > df["%%-trend_open_period_12"])
         if bull_level >= 5:
-            conditions.append(df["%%-trend_close-period_24"] > df["%%-trend_open-period_24"])
+            conditions.append(df["%%-trend_close_period_24"] > df["%%-trend_open_period_24"])
         if bull_level >= 6:
-            conditions.append(df["%%-trend_close-period_48"] > df["%%-trend_open-period_48"])
+            conditions.append(df["%%-trend_close_period_48"] > df["%%-trend_open_period_48"])
         if bull_level >= 7:
-            conditions.append(df["%%-trend_close-period_72"] > df["%%-trend_open-period_72"])
+            conditions.append(df["%%-trend_close_period_72"] > df["%%-trend_open_period_72"])
         if bull_level >= 8:
-            conditions.append(df["%%-trend_close-period_96"] > df["%%-trend_open-period_96"])
+            conditions.append(df["%%-trend_close_period_96"] > df["%%-trend_open_period_96"])
 
         # Fan magnitude acceleration
         conditions.append(df["%%-fan_magnitude_gain"] >= self.buy_params["buy_min_fan_magnitude_gain"])
@@ -296,7 +310,7 @@ class ichiV1(IStrategy):
         trend_indicator = self.sell_params["sell_trend_indicator"]
         period = int(self.trend_period_map[trend_indicator])
         cond = qtpylib.crossed_below(
-            df["%%-trend_close-period_1"], df[f"%%-trend_close-period_{period}"]
+            df["%%-trend_close_period_1"], df[f"%%-trend_close_period_{period}"]
         )
         df.loc[cond.fillna(False), "exit_long"] = 1
         return df
