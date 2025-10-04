@@ -539,8 +539,14 @@ class ichiV1(IStrategy):
                 "%%-tenkan_sen", "%%-kijun_sen", "%%-senkou_a", "%%-senkou_b",
                 "%%-cloud_green", "%%-cloud_red",
             ] if c in dataframe.columns]
-            # trend / fan
-            for p in [1,3,6,12,24,48,72,96]:
+            # trend / fan (use dynamic periods if available)
+            dyn_periods = (
+                list(self.freqai_info.get("feature_parameters", {}).get("indicator_periods_candles", []))
+                if hasattr(self, "freqai_info") else []
+            )
+            if not dyn_periods:
+                dyn_periods = [1,3,6,12,24,48,72,96]
+            for p in sorted(set(int(p) for p in dyn_periods)):
                 tc = f"%%-trend_close_period_{p}"
                 to = f"%%-trend_open_period_{p}"
                 if tc in dataframe.columns: cols.append(tc)
