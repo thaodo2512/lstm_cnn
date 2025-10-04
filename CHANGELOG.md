@@ -69,6 +69,12 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
   - Test mode sets long when `&-s_close > thr` and short when `< -thr` (or simple momentum fallback).
 - chore(compose/.env): Expose test-mode envs in compose; document in `.env.example`.
 
+## [0.1.36] - 2025-10-04
+### Chore
+- gitignore: Ignore Freqtrade outputs to keep repo clean:
+  - `freqtrade_user_data/backtest_results/`
+  - `freqtrade_user_data/models/`
+
 ## [0.1.25] - 2025-10-03
 ### Performance
 - perf(freqai): Add a fast GPU profile for backtesting/training.

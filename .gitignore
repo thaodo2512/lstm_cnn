@@ -13,6 +13,8 @@ venv/
 # Data / artifacts
 data/
 logs/
+freqtrade_user_data/backtest_results/
+freqtrade_user_data/models/
 *.pt
 *.pkl
 metrics.json
@@ -21,4 +23,3 @@ attention_heatmap.png
 
 # Jupyter
 .ipynb_checkpoints/
-
