@@ -53,6 +53,11 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
   - Adds a rolling mean/std fallback for `&-s_close_mean/std` if not injected by FreqAI.
   - Exits on EMA trend cross per configured timeframe map.
 
+## [0.1.33] - 2025-10-04
+### Added
+- docs: Add `.env.example` with common Compose envs and ichiV1 tunables (`ICHI_*`).
+- chore(compose): Expose `ICHI_*` envs in backtest and signal-bot services for quick tuning without code changes.
+
 ## [0.1.25] - 2025-10-03
 ### Performance
 - perf(freqai): Add a fast GPU profile for backtesting/training.
