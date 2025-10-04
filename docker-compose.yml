@@ -124,6 +124,14 @@ services:
       FREQAI_DEVICE: cuda
       MPLBACKEND: Agg
       TIMERANGE: ${TIMERANGE:-20240101-20240201}
+      # Strategy tuning (ichiV1)
+      ICHI_STD_MULT: ${ICHI_STD_MULT:-0.5}
+      ICHI_BULLISH_LEVEL: ${ICHI_BULLISH_LEVEL:-2}
+      ICHI_CLOUD_LEVEL: ${ICHI_CLOUD_LEVEL:-1}
+      ICHI_FAN_SHIFT: ${ICHI_FAN_SHIFT:-1}
+      ICHI_FAN_GAIN: ${ICHI_FAN_GAIN:-1.001}
+      ICHI_REQUIRE_DOPREDICT: ${ICHI_REQUIRE_DOPREDICT:-true}
+      ICHI_USE_HA: ${ICHI_USE_HA:-true}
     volumes:
       - ./:/workspace
       - ./freqtrade_user_data:/freqtrade/user_data
@@ -164,6 +172,14 @@ services:
       NOTIFY_TELEGRAM: ${NOTIFY_TELEGRAM:-false}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
       TELEGRAM_CHAT_ID: ${TELEGRAM_CHAT_ID:-}
+      # Strategy tuning (ichiV1)
+      ICHI_STD_MULT: ${ICHI_STD_MULT:-0.5}
+      ICHI_BULLISH_LEVEL: ${ICHI_BULLISH_LEVEL:-2}
+      ICHI_CLOUD_LEVEL: ${ICHI_CLOUD_LEVEL:-1}
+      ICHI_FAN_SHIFT: ${ICHI_FAN_SHIFT:-1}
+      ICHI_FAN_GAIN: ${ICHI_FAN_GAIN:-1.001}
+      ICHI_REQUIRE_DOPREDICT: ${ICHI_REQUIRE_DOPREDICT:-true}
+      ICHI_USE_HA: ${ICHI_USE_HA:-true}
     volumes:
       - ./:/workspace
       - ./freqtrade_user_data:/freqtrade/user_data
@@ -196,6 +212,14 @@ services:
       FREQAIMODEL: ${FREQAIMODEL:-HybridTimeseriesFreqAIModel_tinhn}
       TIMEFRAMES: ${TIMEFRAMES:-1h}
       TIMERANGE: ${TIMERANGE:-20240101-20240201}
+      # Strategy tuning (ichiV1)
+      ICHI_STD_MULT: ${ICHI_STD_MULT:-0.5}
+      ICHI_BULLISH_LEVEL: ${ICHI_BULLISH_LEVEL:-2}
+      ICHI_CLOUD_LEVEL: ${ICHI_CLOUD_LEVEL:-1}
+      ICHI_FAN_SHIFT: ${ICHI_FAN_SHIFT:-1}
+      ICHI_FAN_GAIN: ${ICHI_FAN_GAIN:-1.001}
+      ICHI_REQUIRE_DOPREDICT: ${ICHI_REQUIRE_DOPREDICT:-true}
+      ICHI_USE_HA: ${ICHI_USE_HA:-true}
     volumes:
       - ./:/workspace
       - ./freqtrade_user_data:/freqtrade/user_data
