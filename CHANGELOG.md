@@ -46,6 +46,13 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
   - `freqtrade_user_data/config.json`: Set `lstm_layers` from 2 -> 4 and `num_transformer_layers` from 2 -> 4.
   - Applies to FreqAI backtests/training via `model_training_parameters`.
 
+## [0.1.32] - 2025-10-04
+### Added
+- feat(strategy): Add `ichiV1` Ichimoku + FreqAI hybrid strategy (long-only).
+  - Indicators moved into FreqAI feature hooks; strategy gates entries with FreqAI prediction of forward return `&-s_close`.
+  - Adds a rolling mean/std fallback for `&-s_close_mean/std` if not injected by FreqAI.
+  - Exits on EMA trend cross per configured timeframe map.
+
 ## [0.1.25] - 2025-10-03
 ### Performance
 - perf(freqai): Add a fast GPU profile for backtesting/training.
