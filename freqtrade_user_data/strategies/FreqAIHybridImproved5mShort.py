@@ -34,7 +34,7 @@ class FreqAIHybridImproved5mShort(IStrategy):
     informative_timeframe = "1h"
     informative_timeframe_2 = "4h"
     process_only_new_candles = True
-    can_short: bool = False
+    can_short: bool = True
     use_custom_stoploss: bool = True
     # Toggle requiring 4h uptrend for long regime (default off to allow trades)
     require_4h_long: bool = False
