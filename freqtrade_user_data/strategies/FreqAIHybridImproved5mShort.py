@@ -12,7 +12,7 @@ FreqAIHybridImproved5mShort v2
 Requires FreqAI to inject prediction columns (e.g., '&-prediction', '&-pred_up_prob').
 """
 
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Optional
 
 import numpy as np
 import pandas as pd
@@ -20,6 +20,7 @@ from pandas import DataFrame, Series
 
 from freqtrade.strategy.interface import IStrategy
 from freqtrade.strategy import IntParameter, DecimalParameter, merge_informative_pair
+from datetime import datetime
 
 try:
     import talib.abstract as ta  # type: ignore
@@ -40,8 +41,8 @@ class FreqAIHybridImproved5mShort(IStrategy):
     # Wider trailing so winners can run
     trailing_stop = True
     trailing_only_offset_is_reached = True
-    trailing_stop_positive = 0.008          # 0.8%
-    trailing_stop_positive_offset = 0.025   # activate after 2.5%
+    trailing_stop_positive = 0.006          # 0.6%
+    trailing_stop_positive_offset = 0.018   # activate after 1.8%
 
     stoploss = -0.10
     startup_candle_count: int = 3000
@@ -60,14 +61,14 @@ class FreqAIHybridImproved5mShort(IStrategy):
     pred_ema_span = IntParameter(3, 9, default=5, space="buy")
 
     k_atr = DecimalParameter(0.30, 1.20, default=0.60, decimals=2, space="buy")
-    k_exit_atr = DecimalParameter(0.5, 2.0, default=1.0, decimals=2, space="sell")
+    k_exit_atr = DecimalParameter(0.5, 2.0, default=0.70, decimals=2, space="sell")
 
     fee_buffer = DecimalParameter(0.0008, 0.0020, default=0.0012, decimals=4, space="buy")
-    min_pred_move = DecimalParameter(0.0005, 0.0050, default=0.0015, decimals=4, space="buy")
+    min_pred_move = DecimalParameter(0.0015, 0.0040, default=0.0025, decimals=4, space="buy")
 
-    prob_up_gate = DecimalParameter(0.58, 0.72, default=0.62, decimals=2, space="buy")
-    prob_down_gate = DecimalParameter(0.58, 0.72, default=0.62, decimals=2, space="sell")
-    prob_exit_gate = DecimalParameter(0.35, 0.50, default=0.42, decimals=2, space="sell")
+    prob_up_gate = DecimalParameter(0.60, 0.72, default=0.66, decimals=2, space="buy")
+    prob_down_gate = DecimalParameter(0.60, 0.72, default=0.66, decimals=2, space="sell")
+    prob_exit_gate = DecimalParameter(0.45, 0.55, default=0.48, decimals=2, space="sell")
 
     slope_gate = DecimalParameter(0.0, 0.0020, default=0.0002, decimals=5, space="buy")
 
@@ -158,6 +159,8 @@ class FreqAIHybridImproved5mShort(IStrategy):
         atr_5m = self._atr(dataframe, 14)
         dataframe["atr_pct"] = (atr_5m / dataframe["close"]).replace([np.inf, -np.inf], np.nan).fillna(0.0)
         dataframe["thr"] = float(self.fee_buffer.value) + float(self.k_atr.value) * dataframe["atr_pct"]
+        # Chop filter: require some volatility
+        dataframe["atr_ok"] = dataframe["atr_pct"] > 0.003
         dataframe["gate_mag"] = dataframe["pred_ret_ema"].abs()
 
         # 1h regime and buffers
@@ -235,6 +238,7 @@ class FreqAIHybridImproved5mShort(IStrategy):
             & (dataframe["rsi_1h"] > int(self.rsi_threshold.value))
             & (dataframe["regime_long"])
             & (dataframe["prob_gate_long_ok"])
+            & (dataframe["atr_ok"])  # avoid tiny-range chop
             & (dataframe["volume"] > 0)
         )
 
@@ -245,6 +249,7 @@ class FreqAIHybridImproved5mShort(IStrategy):
             & (dataframe["rsi_1h"] < 50)
             & (dataframe["regime_short"])
             & (dataframe["prob_gate_short_ok"])
+            & (dataframe["atr_ok"])  # avoid tiny-range chop
             & (dataframe["volume"] > 0)
         )
 
@@ -258,7 +263,7 @@ class FreqAIHybridImproved5mShort(IStrategy):
         dataframe["exit_tag"] = ""
 
         # Earlier flip: exit on zero-cross of pred_ret_ema or weaker threshold, plus ATR guard on 1h
-        half_thr = 0.5 * dataframe["thr"]
+        half_thr = 0.25 * dataframe["thr"]
         k_exit = float(self.k_exit_atr.value)
 
         exit_long = (
@@ -280,6 +285,42 @@ class FreqAIHybridImproved5mShort(IStrategy):
         dataframe.loc[exit_long, ["exit_long", "exit_tag"]] = (1, "L_exit_flip")
         dataframe.loc[exit_short, ["exit_short", "exit_tag"]] = (1, "S_exit_flip")
         return dataframe
+
+    # --------- Time-based exit tied to label horizon ---------
+    def _tf_minutes(self) -> int:
+        """Return timeframe length in minutes for the current strategy timeframe."""
+        tf = str(self.timeframe)
+        if tf.endswith("m"):
+            return int(tf[:-1])
+        if tf.endswith("h"):
+            return 60 * int(tf[:-1])
+        if tf.endswith("d"):
+            return 1440 * int(tf[:-1])
+        return 5
+
+    def custom_exit(
+        self,
+        pair: str,
+        trade: Any,
+        current_time: datetime,
+        current_rate: float,
+        current_profit: float,
+        **kwargs: Any,
+    ) -> Optional[str]:
+        """Time-stop around label horizon to prevent grind.
+
+        Exits after ~1.5x label-period candles since entry.
+        """
+        try:
+            lp = int(self.freqai_info.get("feature_parameters", {}).get("label_period_candles", 24))
+        except Exception:
+            lp = 24
+        max_candles = int(1.5 * lp)
+        age_minutes = int((current_time - trade.open_date_utc).total_seconds() / 60)
+        age_candles = age_minutes // max(1, self._tf_minutes())
+        if age_candles >= max_candles:
+            return "time_stop"
+        return None
 
     # --------- FreqAI hooks ---------
     def set_freqai_targets(self, dataframe: DataFrame, metadata: Dict[str, Any], **kwargs: Any) -> DataFrame:
