@@ -40,10 +40,23 @@ echo "Listing available data (pre-download)..."
 freqtrade list-data --config "$CONFIG_TMP" --show-timerange || true
 
 echo "Downloading backtest data for $PAIRS_CSV ..."
-freqtrade download-data --config "$CONFIG_TMP" -t "$TIMEFRAMES" --timerange "$TIMERANGE"
+# Build multiple -t args from TIMEFRAMES (supports comma or space separated)
+TF_INPUT="${TIMEFRAMES:-1h}"
+TF_LIST=()
+for tf in $(echo "$TF_INPUT" | tr ',' ' '); do
+  tf=$(echo "$tf" | xargs)
+  [[ -n "$tf" ]] && TF_LIST+=("$tf")
+done
+TF_ARGS=()
+for tf in "${TF_LIST[@]}"; do
+  TF_ARGS+=("-t" "$tf")
+done
+freqtrade download-data --config "$CONFIG_TMP" ${TF_ARGS[@]} --timerange "$TIMERANGE"
 
 echo "Ensuring pre-start history for FreqAI (optional)..."
-bash /workspace/scripts/freqtrade_download_prestart_blocks.sh "$CONFIG_TMP" "$TIMEFRAMES" "$TIMERANGE" "$BLOCKS" "$BLOCK_DAYS" || true
+for tf in "${TF_LIST[@]}"; do
+  bash /workspace/scripts/freqtrade_download_prestart_blocks.sh "$CONFIG_TMP" "$tf" "$TIMERANGE" "$BLOCKS" "$BLOCK_DAYS" || true
+done
 
 echo "Running backtest..."
 mkdir -p /freqtrade/user_data/backtest_results
