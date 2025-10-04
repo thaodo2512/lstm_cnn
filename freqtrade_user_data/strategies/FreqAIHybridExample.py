@@ -35,6 +35,19 @@ class FreqAIHybridExample(IStrategy):
     # Allow enough history for indicators and label shifts
     startup_candle_count: int = 240
 
+    @property
+    def protections(self):
+        # Mirror protections now required to be in-strategy (config key deprecated)
+        return [
+            {"method": "CooldownPeriod", "stop_duration_candles": 12},
+            {
+                "method": "MaxDrawdown",
+                "lookback_period_candles": 720,
+                "stop_duration_candles": 144,
+                "max_allowed_drawdown": 0.20,
+            },
+        ]
+
     def populate_indicators(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         # Trigger FreqAI pipeline (training/prediction and column injection)
         df = self.freqai.start(dataframe, metadata, self)

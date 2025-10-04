@@ -81,6 +81,22 @@ class FreqAIHybridImproved5mShort(IStrategy):
         },
     }
 
+    @property
+    def protections(self) -> List[Dict[str, Any]]:
+        """Define exchange-agnostic protections (moved from deprecated config).
+
+        Enable via `--enable-protections` in backtesting/hyperopt.
+        """
+        return [
+            {"method": "CooldownPeriod", "stop_duration_candles": 12},
+            {
+                "method": "MaxDrawdown",
+                "lookback_period_candles": 720,
+                "stop_duration_candles": 144,
+                "max_allowed_drawdown": 0.20,
+            },
+        ]
+
     # --- TA helpers ---
     @staticmethod
     def _ema(s: Series, n: int) -> Series:
