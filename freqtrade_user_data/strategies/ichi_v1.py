@@ -60,7 +60,8 @@ class ichiV1(IStrategy):
     timeframe = "5m"
 
     startup_candle_count = 96
-    process_only_new_candles = False
+    # FreqAI requires new-candle processing in live mode
+    process_only_new_candles = True
 
     trailing_stop = False
     # trailing_stop_positive = 0.002
