@@ -183,14 +183,41 @@ class FreqAIHybridImproved5mShort(IStrategy):
             dataframe["rsi_1h"] = self._rsi(dataframe["close"], 14)
 
         # Probabilities (optional)
-        if prob_up_col:
+        has_prob_up = bool(prob_up_col)
+        has_prob_dn = bool(prob_dn_col)
+        if has_prob_up:
             dataframe["prob_up"] = dataframe[prob_up_col].clip(0.0, 1.0)
         else:
             dataframe["prob_up"] = 0.5
-        if prob_dn_col:
+        if has_prob_dn:
             dataframe["prob_down"] = dataframe[prob_dn_col].clip(0.0, 1.0)
         else:
             dataframe["prob_down"] = 1.0 - dataframe["prob_up"]
+
+        # Precompute probability gates so entries still work when probabilities are absent
+        # If no prob columns, treat gates as passed (True)
+        dataframe["prob_gate_long_ok"] = (
+            dataframe["prob_up"] >= float(self.prob_up_gate.value)
+            if has_prob_up
+            else True
+        )
+        dataframe["prob_gate_short_ok"] = (
+            dataframe["prob_down"] >= float(self.prob_down_gate.value)
+            if has_prob_dn
+            else True
+        )
+
+        # Exit probability triggers (only when probabilities are present)
+        dataframe["prob_exit_long_hit"] = (
+            dataframe["prob_up"] < float(self.prob_exit_gate.value)
+            if has_prob_up
+            else False
+        )
+        dataframe["prob_exit_short_hit"] = (
+            dataframe["prob_down"] < float(self.prob_exit_gate.value)
+            if has_prob_dn
+            else False
+        )
 
         # do_predict gating
         if do_pred_col:
@@ -211,7 +238,7 @@ class FreqAIHybridImproved5mShort(IStrategy):
             & (dataframe["gate_mag"] > float(self.min_pred_move.value))
             & (dataframe["close"] > dataframe["ema_trend_1h"])
             & (dataframe["rsi_1h"] > int(self.rsi_threshold.value))
-            & (dataframe["prob_up"] >= float(self.prob_up_gate.value))
+            & (dataframe["prob_gate_long_ok"])
             & (dataframe["volume"] > 0)
         )
 
@@ -221,7 +248,7 @@ class FreqAIHybridImproved5mShort(IStrategy):
             & (dataframe["gate_mag"] > float(self.min_pred_move.value))
             & (dataframe["close"] < dataframe["ema_trend_1h"])
             & (dataframe["rsi_1h"] < 50)
-            & (dataframe["prob_down"] >= float(self.prob_down_gate.value))
+            & (dataframe["prob_gate_short_ok"])
             & (dataframe["volume"] > 0)
         )
 
@@ -238,14 +265,14 @@ class FreqAIHybridImproved5mShort(IStrategy):
             ((dataframe["do_pred"] == 1) & (dataframe["pred_ret_ema"] < -dataframe["thr"]))
             | (dataframe["close"] < dataframe["ema_trend_1h"])
             | (dataframe["rsi_1h"] < 50)
-            | (dataframe["prob_up"] < float(self.prob_exit_gate.value))
+            | (dataframe["prob_exit_long_hit"])  # only true if probs present
         ) & (dataframe["volume"] > 0)
 
         exit_short = (
             ((dataframe["do_pred"] == 1) & (dataframe["pred_ret_ema"] > dataframe["thr"]))
             | (dataframe["close"] > dataframe["ema_trend_1h"])
             | (dataframe["rsi_1h"] > 50)
-            | (dataframe["prob_down"] < float(self.prob_exit_gate.value))
+            | (dataframe["prob_exit_short_hit"])  # only true if probs present
         ) & (dataframe["volume"] > 0)
 
         dataframe.loc[exit_long, ["exit_long", "exit_tag"]] = (1, "L_edge_lost")
