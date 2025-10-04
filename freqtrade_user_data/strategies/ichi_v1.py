@@ -31,12 +31,10 @@ class ichiV1(IStrategy):
     # Buy hyperspace params (can be overridden via env, see _env_* helpers)
     buy_params = {
         "buy_trend_above_senkou_level": 1,
-        # Loosened default to help validate signals; override with ICHI_BULLISH_LEVEL
-        "buy_trend_bullish_level": 2,
-        # Require fewer consecutive increases; override with ICHI_FAN_SHIFT
-        "buy_fan_magnitude_shift_value": 1,
-        # Slightly easier acceleration gate; override with ICHI_FAN_GAIN
-        "buy_min_fan_magnitude_gain": 1.001,
+        # Original defaults were stricter; keep env overrides available
+        "buy_trend_bullish_level": 6,
+        "buy_fan_magnitude_shift_value": 3,
+        "buy_min_fan_magnitude_gain": 1.002,
         # "buy_min_fan_magnitude_gain": 1.008,  # very safe (Win% ~90%), fewer trades
     }
 
@@ -46,33 +44,31 @@ class ichiV1(IStrategy):
         "sell_trend_indicator": "trend_close_2h",
     }
 
-    # ROI table (trend-following, avoid fast decay to ~0)
+    # ROI/Stoploss defaults closer to the original idea (can still override via config)
     minimal_roi = {
-        # Keep some profit expectation early, decay slowly over hours/days
-        "0": 0.02,     # 2.0% immediately
-        "360": 0.012,  # after 6h
-        "1440": 0.004, # after 24h
-        "4320": 0.0,   # after 3d
+        "0": 0.059,
+        "10": 0.037,
+        "41": 0.012,
+        "114": 0.0,
     }
 
-    # Stoploss (tighten to cap downside; trailing will manage winners)
-    stoploss = -0.03
+    stoploss = -0.275
 
     # Optimal timeframe for the strategy
     timeframe = "5m"
 
     startup_candle_count = 96
     # FreqAI requires new-candle processing in live mode
-    process_only_new_candles = True
+    process_only_new_candles = True  # required for FreqAI in live
 
-    trailing_stop = True
-    trailing_stop_positive = 0.004
-    trailing_stop_positive_offset = 0.012
-    trailing_only_offset_is_reached = True
+    trailing_stop = False
+    # trailing_stop_positive = 0.002
+    # trailing_stop_positive_offset = 0.025
+    # trailing_only_offset_is_reached = True
 
     use_exit_signal = True
-    # Let ROI/trailing govern profit-taking, avoid early losses via exit_signal
-    exit_profit_only = True
+    # Use exit signal in combination with ROI table
+    exit_profit_only = False
     ignore_roi_if_entry_signal = False
     # Enable shorting (requires futures-capable exchange/config)
     # Disabled by default; can re-enable via env gates below
@@ -340,11 +336,12 @@ class ichiV1(IStrategy):
             df["&-s_close_mean"] = roll.mean()
             df["&-s_close_std"] = roll.std(ddof=0)
 
-        # Thresholded target
-        std_mult = self._env_float("ICHI_STD_MULT", 0.5)
-        df["target_roi"] = df["&-s_close_mean"] + df["&-s_close_std"] * std_mult
-        if "&-s_close" in df.columns:
-            conditions.append(df["&-s_close"] > df["target_roi"])
+        # Optional prediction thresholding (disabled by default to mirror original idea)
+        if self._env_bool("ICHI_USE_PRED_THRESHOLD", False):
+            std_mult = self._env_float("ICHI_STD_MULT", 0.5)
+            df["target_roi"] = df["&-s_close_mean"] + df["&-s_close_std"] * std_mult
+            if "&-s_close" in df.columns:
+                conditions.append(df["&-s_close"] > df["target_roi"])
 
         # Trending market above cloud
         level = self._env_int(
