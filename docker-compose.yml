@@ -146,18 +146,18 @@ services:
       - -lc
       - |-
         set -euo pipefail
-        ARGS=(
-          --config /freqtrade/user_data/config.json
-          --freqaimodel HybridTimeseriesFreqAIModel_tinhn
-          --strategy ichiV1
-          --timerange "${TIMERANGE:-20240101-20240201}"
-          --cache day
-        )
+        PROT=""
         if [[ "${ENABLE_PROTECTIONS:-false}" == "true" ]]; then
           echo "Enabling strategy protections (--enable-protections)"
-          ARGS+=(--enable-protections)
+          PROT="--enable-protections"
         fi
-        exec freqtrade backtesting "${ARGS[@]}"
+        exec freqtrade backtesting \
+          --config /freqtrade/user_data/config.json \
+          --freqaimodel HybridTimeseriesFreqAIModel_tinhn \
+          --strategy ichiV1 \
+          --timerange "${TIMERANGE:-20240101-20240201}" \
+          --cache day \
+          $PROT
 
   # Backtest specific pairs via env PAIRS (comma-separated) using a temp config
   freqai-backtest-pairs-gpu-l4:
