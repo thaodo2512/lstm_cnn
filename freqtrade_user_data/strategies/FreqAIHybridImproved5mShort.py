@@ -36,6 +36,8 @@ class FreqAIHybridImproved5mShort(IStrategy):
     process_only_new_candles = True
     can_short: bool = False
     use_custom_stoploss: bool = True
+    # Toggle requiring 4h uptrend for long regime (default off to allow trades)
+    require_4h_long: bool = False
 
     # ROI OFF (use trailing + exits)
     minimal_roi = {"0": 0.99}
@@ -61,15 +63,15 @@ class FreqAIHybridImproved5mShort(IStrategy):
 
     rsi_threshold = IntParameter(50, 58, default=52, space="buy")  # a bit stricter
     pred_ema_span = IntParameter(3, 9, default=5, space="buy")
-    pred_mult_long = DecimalParameter(1.25, 1.75, default=1.50, decimals=2, space="buy")
+    pred_mult_long = DecimalParameter(1.20, 1.75, default=1.35, decimals=2, space="buy")
 
     k_atr = DecimalParameter(0.30, 1.20, default=0.60, decimals=2, space="buy")
     k_exit_atr = DecimalParameter(0.5, 2.0, default=0.70, decimals=2, space="sell")
     k_sl_atr = DecimalParameter(1.2, 2.0, default=1.5, decimals=2, space="sell")
 
     fee_buffer = DecimalParameter(0.0008, 0.0020, default=0.0012, decimals=4, space="buy")
-    min_pred_move = DecimalParameter(0.0020, 0.0040, default=0.0030, decimals=4, space="buy")
-    atr_ok_min_pct = DecimalParameter(0.0010, 0.0030, default=0.0015, decimals=4, space="buy")
+    min_pred_move = DecimalParameter(0.0020, 0.0040, default=0.0025, decimals=4, space="buy")
+    atr_ok_min_pct = DecimalParameter(0.0010, 0.0030, default=0.0012, decimals=4, space="buy")
 
     prob_up_gate = DecimalParameter(0.60, 0.72, default=0.66, decimals=2, space="buy")
     prob_down_gate = DecimalParameter(0.60, 0.72, default=0.66, decimals=2, space="sell")
@@ -265,11 +267,13 @@ class FreqAIHybridImproved5mShort(IStrategy):
         dataframe["do_pred"] = dataframe[do_pred_col].fillna(0) if do_pred_col else 1
 
         # Regime flags
-        dataframe["regime_long"] = (
-            (dataframe["ema_fast_1h"] > dataframe["ema_slow_1h"])  # 1h up
-            & (dataframe["ema_fast_4h"] > dataframe["ema_slow_4h"])  # 4h up
-            & (dataframe["slope_4h"] > float(self.slope_gate.value))
+        long_1h = (
+            (dataframe["ema_fast_1h"] > dataframe["ema_slow_1h"]) & (dataframe["ema_slow_slope_1h"] > float(self.slope_gate.value))
         )
+        long_4h = (
+            (dataframe["ema_fast_4h"] > dataframe["ema_slow_4h"]) & (dataframe["slope_4h"] > float(self.slope_gate.value))
+        )
+        dataframe["regime_long"] = long_1h & (long_4h if self.require_4h_long else True)
         dataframe["regime_short"] = (
             (dataframe["ema_fast_1h"] < dataframe["ema_slow_1h"])  # 1h down
             & (dataframe["ema_fast_4h"] < dataframe["ema_slow_4h"])  # 4h down
