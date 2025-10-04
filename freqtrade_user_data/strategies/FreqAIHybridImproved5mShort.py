@@ -251,3 +251,70 @@ class FreqAIHybridImproved5mShort(IStrategy):
         dataframe.loc[exit_short, ["exit_short", "exit_tag"]] = (1, "S_edge_lost")
         return dataframe
 
+    # --------- FreqAI required hooks ---------
+    def set_freqai_targets(self, dataframe: DataFrame, metadata: Dict[str, Any], **kwargs: Any) -> DataFrame:
+        """Define target '&-prediction' as close shifted -label_period.
+
+        FreqAI reads this to build labels. label_period (candles) comes from
+        freqai.feature_parameters.label_period_candles in the config.
+        """
+        label_period = int(self.freqai_info.get("feature_parameters", {}).get("label_period_candles", 24))
+        df = dataframe.copy()
+        df["&-prediction"] = df["close"].shift(-label_period)
+        return df
+
+    def feature_engineering_expand_all(self, dataframe: DataFrame, period: int, metadata: Dict[str, Any], **kwargs: Any) -> DataFrame:
+        """Create period-dependent features that FreqAI expands across indicator periods.
+
+        Attempts TA-Lib where available; falls back to pandas variants and safe NaNs
+        for indicators that require longer windows.
+        """
+        df = dataframe.copy()
+        # EMA
+        try:
+            if _HAS_TALIB:
+                df["%-ema"] = ta.EMA(df["close"], timeperiod=period)
+            else:
+                df["%-ema"] = df["close"].ewm(span=max(1, period), adjust=False).mean()
+        except Exception:
+            df["%-ema"] = df["close"].ewm(span=max(1, period), adjust=False).mean()
+
+        # RSI
+        try:
+            if _HAS_TALIB:
+                df["%-rsi"] = ta.RSI(df["close"], timeperiod=period)
+            else:
+                # Wilder RSI fallback
+                delta = df["close"].diff()
+                up = delta.clip(lower=0)
+                down = -delta.clip(upper=0)
+                roll_up = up.ewm(alpha=1 / max(1, period), adjust=False).mean()
+                roll_down = down.ewm(alpha=1 / max(1, period), adjust=False).mean()
+                rs = roll_up / roll_down.replace(0, pd.NA)
+                df["%-rsi"] = 100 - (100 / (1 + rs))
+        except Exception:
+            df["%-rsi"] = pd.Series(np.nan, index=df.index)
+
+        # ADX (optional; safe NaN if missing or too short)
+        try:
+            if _HAS_TALIB and len(df) >= max(2, period):
+                df["%-adx"] = ta.ADX(df["high"], df["low"], df["close"], timeperiod=period)
+            else:
+                df["%-adx"] = pd.Series(np.nan, index=df.index)
+        except Exception:
+            df["%-adx"] = pd.Series(np.nan, index=df.index)
+
+        return df
+
+    def feature_engineering_expand_basic(self, dataframe: DataFrame, metadata: Dict[str, Any], **kwargs: Any) -> DataFrame:
+        df = dataframe.copy()
+        df["%-pct_change"] = df["close"].pct_change()
+        df["%-volume"] = df["volume"]
+        return df
+
+    def feature_engineering_standard(self, dataframe: DataFrame, metadata: Dict[str, Any], **kwargs: Any) -> DataFrame:
+        df = dataframe.copy()
+        if "date" in df.columns:
+            df["%-day_of_week"] = df["date"].dt.dayofweek / 6.0
+            df["%-hour_of_day"] = df["date"].dt.hour / 23.0
+        return df
