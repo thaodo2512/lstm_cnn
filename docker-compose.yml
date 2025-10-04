@@ -135,6 +135,7 @@ services:
       ICHI_ENABLE_SHORT: ${ICHI_ENABLE_SHORT:-true}
       ICHI_TEST_LOOSE: ${ICHI_TEST_LOOSE:-false}
       ICHI_TEST_THR: ${ICHI_TEST_THR:-0.0}
+      ICHI_SELL_TREND: ${ICHI_SELL_TREND:-trend_close_2h}
     volumes:
       - ./:/workspace
       - ./freqtrade_user_data:/freqtrade/user_data
@@ -186,6 +187,7 @@ services:
       ICHI_ENABLE_SHORT: ${ICHI_ENABLE_SHORT:-true}
       ICHI_TEST_LOOSE: ${ICHI_TEST_LOOSE:-false}
       ICHI_TEST_THR: ${ICHI_TEST_THR:-0.0}
+      ICHI_SELL_TREND: ${ICHI_SELL_TREND:-trend_close_2h}
     volumes:
       - ./:/workspace
       - ./freqtrade_user_data:/freqtrade/user_data
@@ -229,6 +231,7 @@ services:
       ICHI_ENABLE_SHORT: ${ICHI_ENABLE_SHORT:-true}
       ICHI_TEST_LOOSE: ${ICHI_TEST_LOOSE:-false}
       ICHI_TEST_THR: ${ICHI_TEST_THR:-0.0}
+      ICHI_SELL_TREND: ${ICHI_SELL_TREND:-trend_close_2h}
     volumes:
       - ./:/workspace
       - ./freqtrade_user_data:/freqtrade/user_data
