@@ -40,6 +40,12 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
   - Stricter entries: require `pred_ret_ema > 1.25 * thr` and higher probability gates, plus min predicted move.
   - Add hyperoptable params: `ema_fast_1h`, `ema_slow_1h`, `slope_gate`, `k_exit_atr`, tighter `prob_*`/`fee_buffer`/`min_pred_move` ranges.
 
+## [0.1.31] - 2025-10-04
+### Changed
+- chore(freqai): Increase model depth for training.
+  - `freqtrade_user_data/config.json`: Set `lstm_layers` from 2 -> 4 and `num_transformer_layers` from 2 -> 4.
+  - Applies to FreqAI backtests/training via `model_training_parameters`.
+
 ## [0.1.25] - 2025-10-03
 ### Performance
 - perf(freqai): Add a fast GPU profile for backtesting/training.
