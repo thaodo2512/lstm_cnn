@@ -32,8 +32,9 @@ except Exception:  # pragma: no cover - optional dependency
 class FreqAIHybridImproved5mShort(IStrategy):
     timeframe = "5m"
     informative_timeframe = "1h"
+    informative_timeframe_2 = "4h"
     process_only_new_candles = True
-    can_short: bool = True
+    can_short: bool = False
 
     # ROI OFF (use trailing + exits)
     minimal_roi = {"0": 0.99}
@@ -41,8 +42,8 @@ class FreqAIHybridImproved5mShort(IStrategy):
     # Wider trailing so winners can run
     trailing_stop = True
     trailing_only_offset_is_reached = True
-    trailing_stop_positive = 0.006          # 0.6%
-    trailing_stop_positive_offset = 0.018   # activate after 1.8%
+    trailing_stop_positive = 0.005          # 0.5%
+    trailing_stop_positive_offset = 0.015   # activate after 1.5%
 
     stoploss = -0.10
     startup_candle_count: int = 3000
@@ -145,7 +146,10 @@ class FreqAIHybridImproved5mShort(IStrategy):
     def informative_pairs(self) -> List[Tuple[str, str]]:
         if self.dp:
             wl = self.dp.current_whitelist()
-            return [(p, self.informative_timeframe) for p in wl]
+            return (
+                [(p, self.informative_timeframe) for p in wl]
+                + [(p, self.informative_timeframe_2) for p in wl]
+            )
         return []
 
     def _inject_freqai(self, dataframe: DataFrame, metadata: Dict[str, Any]) -> DataFrame:
@@ -203,6 +207,22 @@ class FreqAIHybridImproved5mShort(IStrategy):
                 },
                 inplace=True,
             )
+            # 4h regime (strict shorts)
+            inf4 = self.dp.get_pair_dataframe(pair=metadata["pair"], timeframe=self.informative_timeframe_2)
+            inf4["ema_fast"] = self._ema(inf4["close"], 50)
+            inf4["ema_slow"] = self._ema(inf4["close"], 200)
+            inf4["slope"] = inf4["ema_slow"].pct_change().fillna(0.0)
+            dataframe = merge_informative_pair(
+                dataframe, inf4, self.timeframe, self.informative_timeframe_2, ffill=True
+            )
+            dataframe.rename(
+                columns={
+                    f"ema_fast_{self.informative_timeframe_2}": "ema_fast_4h",
+                    f"ema_slow_{self.informative_timeframe_2}": "ema_slow_4h",
+                    f"slope_{self.informative_timeframe_2}": "slope_4h",
+                },
+                inplace=True,
+            )
         else:
             dataframe["ema_trend_1h"] = self._ema(dataframe["close"], int(self.ema_period.value))
             dataframe["ema_fast_1h"] = self._ema(dataframe["close"], int(self.ema_fast_1h.value))
@@ -210,6 +230,10 @@ class FreqAIHybridImproved5mShort(IStrategy):
             dataframe["ema_slow_slope_1h"] = dataframe["ema_slow_1h"].pct_change().fillna(0.0)
             dataframe["rsi_1h"] = self._rsi(dataframe["close"], 14)
             dataframe["atr_1h"] = self._atr(dataframe, 14)
+            # Fallback 4h placeholders
+            dataframe["ema_fast_4h"] = self._ema(dataframe["close"], 50)
+            dataframe["ema_slow_4h"] = self._ema(dataframe["close"], 200)
+            dataframe["slope_4h"] = dataframe["ema_slow_4h"].pct_change().fillna(0.0)
 
         # Probabilities
         has_prob_up = bool(prob_up_col)
@@ -237,7 +261,9 @@ class FreqAIHybridImproved5mShort(IStrategy):
             (dataframe["ema_fast_1h"] > dataframe["ema_slow_1h"]) & (dataframe["ema_slow_slope_1h"] > float(self.slope_gate.value))
         )
         dataframe["regime_short"] = (
-            (dataframe["ema_fast_1h"] < dataframe["ema_slow_1h"]) & (dataframe["ema_slow_slope_1h"] < -float(self.slope_gate.value))
+            (dataframe["ema_fast_1h"] < dataframe["ema_slow_1h"])  # 1h down
+            & (dataframe["ema_fast_4h"] < dataframe["ema_slow_4h"])  # 4h down
+            & (dataframe["slope_4h"] < -float(self.slope_gate.value))
         )
         return dataframe
 
@@ -265,6 +291,8 @@ class FreqAIHybridImproved5mShort(IStrategy):
             & (dataframe["rsi_1h"] < 50)
             & (dataframe["regime_short"])
             & (dataframe["prob_gate_short_ok"])
+            & (dataframe["prob_down"] >= 0.66)
+            & (dataframe["gate_mag"] > 1.5 * dataframe["thr"])  # stronger edge for shorts
             & (dataframe["atr_ok"])  # avoid tiny-range chop
             & (dataframe["volume"] > 0)
         )
@@ -283,15 +311,23 @@ class FreqAIHybridImproved5mShort(IStrategy):
         k_exit = float(self.k_exit_atr.value)
 
         exit_long = (
-            ((dataframe["do_pred"] == 1) & (dataframe["pred_ret_ema"] < 0))  # flip
-            | (dataframe["pred_ret_ema"] < -half_thr)                        # momentum against us
+            (
+                (dataframe["do_pred"] == 1)
+                & (dataframe["pred_ret_ema"] < 0)
+                & (dataframe["pred_ret_ema"].diff() < 0)
+            )
+            | (dataframe["pred_ret_ema"] < -half_thr)
             | (dataframe["rsi_1h"] < 48)
             | (dataframe["close"] < dataframe["ema_trend_1h"] - k_exit * dataframe["atr_1h"])
             | (dataframe["prob_exit_long_hit"])
         ) & (dataframe["volume"] > 0)
 
         exit_short = (
-            ((dataframe["do_pred"] == 1) & (dataframe["pred_ret_ema"] > 0))
+            (
+                (dataframe["do_pred"] == 1)
+                & (dataframe["pred_ret_ema"] > 0)
+                & (dataframe["pred_ret_ema"].diff() > 0)
+            )
             | (dataframe["pred_ret_ema"] > half_thr)
             | (dataframe["rsi_1h"] > 52)
             | (dataframe["close"] > dataframe["ema_trend_1h"] + k_exit * dataframe["atr_1h"])
@@ -304,14 +340,7 @@ class FreqAIHybridImproved5mShort(IStrategy):
 
     # --------- Time-based exit tied to label horizon ---------
     def _tf_minutes(self) -> int:
-        """Return timeframe length in minutes for the current strategy timeframe."""
-        tf = str(self.timeframe)
-        if tf.endswith("m"):
-            return int(tf[:-1])
-        if tf.endswith("h"):
-            return 60 * int(tf[:-1])
-        if tf.endswith("d"):
-            return 1440 * int(tf[:-1])
+        """Return timeframe length in minutes (fixed 5m strategy)."""
         return 5
 
     def custom_exit(
@@ -323,19 +352,27 @@ class FreqAIHybridImproved5mShort(IStrategy):
         current_profit: float,
         **kwargs: Any,
     ) -> Optional[str]:
-        """Time-stop around label horizon to prevent grind.
+        """Loser-only time stop after ~1.0× label horizon."""
+        lp = int(self.freqai_info.get("feature_parameters", {}).get("label_period_candles", 24))
+        age_candles = int((current_time - trade.open_date_utc).total_seconds() / (60 * self._tf_minutes()))
+        if age_candles >= lp and current_profit <= 0:
+            return "time_stop_neg"
+        return None
 
-        Exits after ~1.5x label-period candles since entry.
-        """
-        try:
-            lp = int(self.freqai_info.get("feature_parameters", {}).get("label_period_candles", 24))
-        except Exception:
-            lp = 24
-        max_candles = int(1.5 * lp)
-        age_minutes = int((current_time - trade.open_date_utc).total_seconds() / 60)
-        age_candles = age_minutes // max(1, self._tf_minutes())
-        if age_candles >= max_candles:
-            return "time_stop"
+    def custom_stoploss(
+        self,
+        pair: str,
+        trade: Any,
+        current_time: datetime,
+        current_rate: float,
+        current_profit: float,
+        **kwargs: Any,
+    ) -> Optional[float]:
+        """After half horizon, protect winners near breakeven (~-0.2%)."""
+        lp = int(self.freqai_info.get("feature_parameters", {}).get("label_period_candles", 24))
+        age = (current_time - trade.open_date_utc).total_seconds() / (60 * self._tf_minutes())
+        if age >= 0.5 * lp and current_profit > 0:
+            return -0.002
         return None
 
     # --------- FreqAI hooks ---------
