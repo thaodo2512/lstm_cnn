@@ -652,6 +652,11 @@ class Trainer:
         self.best_val_loss = float("inf")
         self.best_state: Optional[Dict[str, Any]] = None
         self.epochs_no_improve = 0
+        # Set by wrapper after data prep, used for persistence/predict when Base stores Trainer
+        self.x_scaler: Optional[Any] = None
+        self.y_scaler: Optional[Any] = None
+        self.feature_columns: Optional[List[str]] = None
+        self.label_columns: Optional[List[str]] = None
 
     def _step(self, batch: Dict[str, torch.Tensor], train: bool = True) -> Tuple[float, float, float]:
         x = batch["x"].to(self.device, non_blocking=True)
@@ -749,6 +754,62 @@ class Trainer:
         if self.best_state is not None:
             self.model.load_state_dict(self.best_state["model"])  # type: ignore[arg-type]
         return history
+
+    # --- Persistence so DataDrawer can call trainer.save()/load() ---
+    def save(self, path: Any) -> None:
+        p = Path(path)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        try:
+            input_size = int(getattr(self.model.lstm, "input_size"))  # type: ignore[attr-defined]
+        except Exception:
+            input_size = 0
+        payload: Dict[str, Any] = {
+            "version": 1,
+            "cfg": asdict(self.config),
+            "feature_columns": self.feature_columns,
+            "label_columns": self.label_columns,
+            "input_size": input_size,
+            "state_dict": self.model.state_dict(),
+            "x_scaler": self.x_scaler,
+            "y_scaler": self.y_scaler,
+        }
+        torch.save(payload, p)
+
+    def load(self, path: Any) -> "Trainer":
+        obj = torch.load(Path(path), map_location="cpu")
+        cfg_dict = obj.get("cfg", {})
+        if isinstance(cfg_dict, dict):
+            self.config = TrainConfig(**cfg_dict)
+        self.feature_columns = obj.get("feature_columns")
+        self.label_columns = obj.get("label_columns")
+        self.x_scaler = obj.get("x_scaler")
+        self.y_scaler = obj.get("y_scaler")
+        input_size = int(obj.get("input_size", 0))
+        if not input_size or self.config is None:
+            raise RuntimeError("Invalid saved trainer payload: missing cfg/input_size")
+        cfg = self.config
+        self.model = HybridModel(
+            input_size=input_size,
+            horizon=cfg.horizon,
+            lstm_hidden=cfg.lstm_hidden,
+            lstm_layers=cfg.lstm_layers,
+            lstm_dropout=cfg.lstm_dropout,
+            bidirectional=cfg.bidirectional,
+            d_model=cfg.d_model,
+            nhead=cfg.nhead,
+            num_transformer_layers=cfg.num_transformer_layers,
+            ff_dim=cfg.ff_dim,
+            transformer_dropout=cfg.transformer_dropout,
+            pooling=cfg.pooling,
+            classification=cfg.classification,
+            capture_attention=cfg.capture_attention,
+        )
+        sd = obj.get("state_dict")
+        if sd is None:
+            raise RuntimeError("Saved trainer payload missing 'state_dict'")
+        self.model.load_state_dict(sd)
+        self.device = get_device()
+        return self
 
 
 # ---------------------------------------------
@@ -988,15 +1049,21 @@ class HybridTimeseriesFreqAIModel_tinhn(BasePyTorchRegressor):  # type: ignore
         trainer = Trainer(model, device, cfg, classification=cfg.classification)
         trainer.train_epochs(train_loader, val_loader, cfg.epochs)
 
+        # Keep references on wrapper for in-process predict
         self.model = model
         self.x_scaler = x_scaler
         self.y_scaler = y_scaler if not cfg.classification else None
-
-        # Persist references for saving/restoring via FreqAI
         self.freqai_trainer = trainer  # type: ignore[attr-defined]
         self.dk = dk
-        # Return self so FreqAI/DataDrawer can call model.save(...)
-        return self
+
+        # Also populate trainer with metadata so it can be persisted and reloaded alone
+        trainer.x_scaler = self.x_scaler
+        trainer.y_scaler = self.y_scaler
+        trainer.feature_columns = self.feature_columns
+        trainer.label_columns = self.label_columns
+
+        # Return trainer; DataDrawer expects returned object to implement save()
+        return trainer
 
     # --- Persistence API expected by FreqAI DataDrawer ---
     def save(self, path: Any) -> None:  # type: ignore[override]
@@ -1101,18 +1168,36 @@ class HybridTimeseriesFreqAIModel_tinhn(BasePyTorchRegressor):  # type: ignore
         - Returns a DataFrame with the same number of rows as ``unfiltered_df`` and a
           numpy array for ``do_predict`` compatible with FreqAI expectations.
         """
-        if self.model is None or self.x_scaler is None or self.cfg is None:
+        if self.model is None and not hasattr(self, "freqai_trainer"):
             raise RuntimeError("Model has not been fitted before predict call.")
 
-        cfg = self.cfg
-        base_model = self.model
-        # unwrap saved trainer wrappers (BasePyTorchRegressor may wrap torch model)
-        torch_model = base_model.model if hasattr(base_model, "model") else base_model  # type: ignore[assignment]
+        base_model = self.model if self.model is not None else getattr(self, "freqai_trainer", None)
+        # Attempt to get config/scalers from wrapper first, then from base_model (Trainer)
+        cfg = self.cfg or getattr(base_model, "config", None) or getattr(base_model, "cfg", None)
+        if cfg is None:
+            raise RuntimeError("Missing model config for prediction.")
+        x_scaler = self.x_scaler or getattr(base_model, "x_scaler", None)
+        y_scaler = self.y_scaler or getattr(base_model, "y_scaler", None)
+        feature_columns = self.feature_columns or getattr(base_model, "feature_columns", None)
+        label_columns = self.label_columns or getattr(base_model, "label_columns", None)
+
+        # unwrap model to torch.nn.Module
+        torch_model = base_model
+        for _ in range(3):
+            if isinstance(torch_model, nn.Module):
+                break
+            if hasattr(torch_model, "model"):
+                torch_model = getattr(torch_model, "model")  # type: ignore[assignment]
+            else:
+                break
+        if not isinstance(torch_model, nn.Module):
+            raise RuntimeError("Underlying torch model not available for prediction.")
+
         # Normalize device type to torch.device
-        if isinstance(self.device, str):
-            device = torch.device(self.device)
-        else:
-            device = self.device or get_device()
+        device = self.device if isinstance(self.device, torch.device) else None
+        if device is None:
+            dev_attr = getattr(base_model, "device", None)
+            device = dev_attr if isinstance(dev_attr, torch.device) else get_device()
 
         # Ensure model is on the selected device
         try:
@@ -1172,10 +1257,10 @@ class HybridTimeseriesFreqAIModel_tinhn(BasePyTorchRegressor):  # type: ignore
         if total_len < cfg.window_size:
             # Not enough data to form a single window -> return zeros matching length
             if cfg.classification:
-                column_name = self.label_columns[0] if self.label_columns else "&-pred_up_prob"
+                column_name = (label_columns[0] if label_columns else "&-pred_up_prob")
                 pred_df = pd.DataFrame({column_name: np.zeros(total_len, dtype=np.float32)}, index=feature_df.index)
             else:
-                columns = self.label_columns or ["&-prediction"]
+                columns = label_columns or ["&-prediction"]
                 pred_df = pd.DataFrame(np.zeros((total_len, len(columns)), dtype=np.float32), columns=columns, index=feature_df.index)
             return pred_df, dk.do_predict
 
@@ -1194,7 +1279,7 @@ class HybridTimeseriesFreqAIModel_tinhn(BasePyTorchRegressor):  # type: ignore
 
         # Scale & forward pass (batch inference)
         dummy_y = np.zeros((len(X_windows), cfg.horizon), dtype=np.float32)
-        X_scaled, _ = apply_scalers(X_windows, dummy_y, self.x_scaler, self.y_scaler, cfg.classification)
+        X_scaled, _ = apply_scalers(X_windows, dummy_y, x_scaler, y_scaler, cfg.classification)
 
         torch_model.eval()
         preds_list: List[np.ndarray] = []
@@ -1223,7 +1308,7 @@ class HybridTimeseriesFreqAIModel_tinhn(BasePyTorchRegressor):  # type: ignore
         if cfg.classification:
             probs = torch.softmax(torch.from_numpy(preds_np), dim=-1).numpy() if len(preds_np) else np.zeros((0, 2), dtype=np.float32)
             prob_up = probs[:, 1] if probs.shape[-1] > 1 else np.zeros(len(probs), dtype=np.float32)
-            column_name = self.label_columns[0] if self.label_columns else "&-pred_up_prob"
+            column_name = (label_columns[0] if label_columns else "&-pred_up_prob")
             full_vals = np.zeros(total_len, dtype=np.float32)
             # end_indices reference the last index for each window
             if len(end_indices) > 0:
