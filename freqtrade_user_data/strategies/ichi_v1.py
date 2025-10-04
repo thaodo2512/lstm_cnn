@@ -18,6 +18,7 @@ from functools import reduce
 from datetime import datetime, timedelta
 from freqtrade.strategy import merge_informative_pair  # type: ignore
 import numpy as np
+import os
 
 
 class ichiV1(IStrategy):
@@ -29,13 +30,15 @@ class ichiV1(IStrategy):
     - If FreqAI does not provide '&-s_close_mean'/'&-s_close_std', a rolling mean/std fallback is used.
     """
 
-    # Buy hyperspace params
+    # Buy hyperspace params (can be overridden via env, see _env_* helpers)
     buy_params = {
         "buy_trend_above_senkou_level": 1,
-        "buy_trend_bullish_level": 6,
-        "buy_fan_magnitude_shift_value": 3,
-        # NOTE: Good value (Win% ~70%), a lot of trades
-        "buy_min_fan_magnitude_gain": 1.002,
+        # Loosened default to help validate signals; override with ICHI_BULLISH_LEVEL
+        "buy_trend_bullish_level": 2,
+        # Require fewer consecutive increases; override with ICHI_FAN_SHIFT
+        "buy_fan_magnitude_shift_value": 1,
+        # Slightly easier acceleration gate; override with ICHI_FAN_GAIN
+        "buy_min_fan_magnitude_gain": 1.001,
         # "buy_min_fan_magnitude_gain": 1.008,  # very safe (Win% ~90%), fewer trades
     }
 
@@ -122,6 +125,30 @@ class ichiV1(IStrategy):
             "fan_magnitude_gain": {"%%-fan_magnitude_gain": {}},
         },
     }
+
+    # -------------------- Env helpers --------------------
+    @staticmethod
+    def _env_float(key: str, default: float) -> float:
+        try:
+            v = os.getenv(key)
+            return float(v) if v not in (None, "") else default
+        except Exception:
+            return default
+
+    @staticmethod
+    def _env_int(key: str, default: int) -> int:
+        try:
+            v = os.getenv(key)
+            return int(v) if v not in (None, "") else default
+        except Exception:
+            return default
+
+    @staticmethod
+    def _env_bool(key: str, default: bool) -> bool:
+        v = os.getenv(key)
+        if v is None or v == "":
+            return default
+        return str(v).strip().lower() in {"1", "true", "yes", "y", "on"}
 
     # -------------------- FreqAI feature hooks --------------------
     def feature_engineering_expand_all(
@@ -215,11 +242,12 @@ class ichiV1(IStrategy):
 
     # -------------------- Strategy hooks --------------------
     def populate_indicators(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
-        heikinashi = qtpylib.heikinashi(dataframe)
-        dataframe["open"] = heikinashi["open"]
-        # dataframe['close'] = heikinashi['close']
-        dataframe["high"] = heikinashi["high"]
-        dataframe["low"] = heikinashi["low"]
+        if self._env_bool("ICHI_USE_HA", True):
+            heikinashi = qtpylib.heikinashi(dataframe)
+            dataframe["open"] = heikinashi["open"]
+            # dataframe['close'] = heikinashi['close']
+            dataframe["high"] = heikinashi["high"]
+            dataframe["low"] = heikinashi["low"]
 
         dataframe = self.freqai.start(dataframe, metadata, self)
         return dataframe
@@ -231,7 +259,8 @@ class ichiV1(IStrategy):
         conditions = []
 
         # Integrate FreqAI prediction
-        if "do_predict" in df.columns:
+        require_dp = self._env_bool("ICHI_REQUIRE_DOPREDICT", True)
+        if require_dp and "do_predict" in df.columns:
             conditions.append(df["do_predict"] == 1)
 
         # Fallback for target statistics if not provided by FreqAI
@@ -242,12 +271,15 @@ class ichiV1(IStrategy):
             df["&-s_close_std"] = roll.std(ddof=0)
 
         # Thresholded target
-        df["target_roi"] = df["&-s_close_mean"] + df["&-s_close_std"] * 1.5
+        std_mult = self._env_float("ICHI_STD_MULT", 0.5)
+        df["target_roi"] = df["&-s_close_mean"] + df["&-s_close_std"] * std_mult
         if "&-s_close" in df.columns:
             conditions.append(df["&-s_close"] > df["target_roi"])
 
         # Trending market above cloud
-        level = int(self.buy_params["buy_trend_above_senkou_level"])
+        level = self._env_int(
+            "ICHI_CLOUD_LEVEL", int(self.buy_params["buy_trend_above_senkou_level"])
+        )
         if level >= 1:
             conditions.append(df["%%-trend_close_period_1"] > df["%%-senkou_a"])
             conditions.append(df["%%-trend_close_period_1"] > df["%%-senkou_b"])
@@ -274,7 +306,9 @@ class ichiV1(IStrategy):
             conditions.append(df["%%-trend_close_period_96"] > df["%%-senkou_b"])
 
         # Trends bullish (close EMA above open EMA)
-        bull_level = int(self.buy_params["buy_trend_bullish_level"])
+        bull_level = self._env_int(
+            "ICHI_BULLISH_LEVEL", int(self.buy_params["buy_trend_bullish_level"])
+        )
         if bull_level >= 1:
             conditions.append(df["%%-trend_close_period_1"] > df["%%-trend_open_period_1"])
         if bull_level >= 2:
@@ -293,9 +327,19 @@ class ichiV1(IStrategy):
             conditions.append(df["%%-trend_close_period_96"] > df["%%-trend_open_period_96"])
 
         # Fan magnitude acceleration
-        conditions.append(df["%%-fan_magnitude_gain"] >= self.buy_params["buy_min_fan_magnitude_gain"])
+        fan_gain = float(
+            self._env_float(
+                "ICHI_FAN_GAIN", float(self.buy_params["buy_min_fan_magnitude_gain"]) 
+            )
+        )
+        conditions.append(df["%%-fan_magnitude_gain"] >= fan_gain)
         conditions.append(df["%%-fan_magnitude"] > 1)
-        for x in range(int(self.buy_params["buy_fan_magnitude_shift_value"])):
+        fan_shift = int(
+            self._env_int(
+                "ICHI_FAN_SHIFT", int(self.buy_params["buy_fan_magnitude_shift_value"]) 
+            )
+        )
+        for x in range(fan_shift):
             conditions.append(df["%%-fan_magnitude"].shift(x + 1) < df["%%-fan_magnitude"])
 
         if conditions:
