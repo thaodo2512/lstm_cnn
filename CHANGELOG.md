@@ -31,6 +31,15 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 - feat(scripts): `scripts/run_trade_pairs.sh` — temp-config wrapper to run the bot with a custom whitelist without altering the main config.
 - config: Add `telegram` section placeholders (disabled by default). Fill `token` and `chat_id`, then set `enabled: true` to receive messages.
 
+## [0.1.30] - 2025-10-04
+### Changed
+- feat(strategy): Upgrade `FreqAIHybridImproved5mShort` to v2 regime-based logic.
+  - Trade with 1h regime: long only when `EMA_fast(1h) > EMA_slow(1h)` with positive slope; short only when opposite holds.
+  - Remove ROI cap: set `minimal_roi={"0": 0.99}` and rely on trailing + exit signals.
+  - Earlier exits on edge loss: flip on `pred_ret_ema` zero-cross; add ATR(1h) guard around `ema_trend_1h` via `k_exit_atr`.
+  - Stricter entries: require `pred_ret_ema > 1.25 * thr` and higher probability gates, plus min predicted move.
+  - Add hyperoptable params: `ema_fast_1h`, `ema_slow_1h`, `slope_gate`, `k_exit_atr`, tighter `prob_*`/`fee_buffer`/`min_pred_move` ranges.
+
 ## [0.1.25] - 2025-10-03
 ### Performance
 - perf(freqai): Add a fast GPU profile for backtesting/training.
