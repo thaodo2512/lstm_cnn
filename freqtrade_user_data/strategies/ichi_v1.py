@@ -129,6 +129,12 @@ class ichiV1(IStrategy):
         },
     }
 
+    def __init__(self, config: dict) -> None:
+        super().__init__(config)
+        # Make short capability runtime-togglable via env.
+        # If you set ICHI_ENABLE_SHORT=true in .env / compose env, shorts are allowed.
+        self.can_short = self._env_bool("ICHI_ENABLE_SHORT", False)
+
     @property
     def protections(self):
         # Define protections in-strategy (config key deprecated in recent Freqtrade)
