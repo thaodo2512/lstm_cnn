@@ -193,3 +193,7 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 - fix(exchange): Set `ccxt_config.options.defaultType=future` (and async) for Binance to ensure futures markets are loaded, preventing pairlist from removing futures pairs as "not tradable".
 ### Fixed
 - fix(scripts): Read `PAIRS` (fallback `PAIRS_CSV`) inside helper scripts so multiple pairs passed via compose env are recognized. Prevents "No pairs provided via PAIRS env." errors.
+
+## [0.1.30] - 2025-10-04
+### Added
+- chore(scripts): Add `scripts/clean_repo.sh` to purge artifacts, data, models, backtest results, caches, and optionally docker state. Dry-run by default; require `--yes` to apply.

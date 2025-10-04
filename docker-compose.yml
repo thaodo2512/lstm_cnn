@@ -194,6 +194,8 @@ services:
       PAIRS: ${PAIRS:-BTC/USDT:USDT}
       STRATEGY: ${STRATEGY:-FreqAIHybridExample}
       FREQAIMODEL: ${FREQAIMODEL:-HybridTimeseriesFreqAIModel_tinhn}
+      TIMEFRAMES: ${TIMEFRAMES:-1h}
+      TIMERANGE: ${TIMERANGE:-20240101-20240201}
     volumes:
       - ./:/workspace
       - ./freqtrade_user_data:/freqtrade/user_data
