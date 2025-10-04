@@ -129,6 +129,19 @@ class ichiV1(IStrategy):
         },
     }
 
+    @property
+    def protections(self):
+        # Define protections in-strategy (config key deprecated in recent Freqtrade)
+        return [
+            {"method": "CooldownPeriod", "stop_duration_candles": 12},
+            {
+                "method": "MaxDrawdown",
+                "lookback_period_candles": 144,
+                "stop_duration_candles": 48,
+                "max_allowed_drawdown": 0.06,
+            },
+        ]
+
     # -------------------- Env helpers --------------------
     @staticmethod
     def _env_float(key: str, default: float) -> float:

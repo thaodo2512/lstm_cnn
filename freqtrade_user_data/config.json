@@ -68,20 +68,6 @@
   },
   
   "tradable_balance_ratio": 0.3,
-
-  "protections": [
-    {
-      "method": "StoplossGuard",
-      "lookback_period_candles": 144,
-      "trade_limit": 1,
-      "stop_duration_candles": 48,
-      "only_per_pair": true
-    },
-    {
-      "method": "CooldownPeriod",
-      "stop_duration_candles": 12
-    }
-  ],
   
   "freqai": {
     "enabled": true,
