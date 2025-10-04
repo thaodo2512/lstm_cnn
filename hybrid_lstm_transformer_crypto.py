@@ -34,6 +34,7 @@ import time
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -994,7 +995,77 @@ class HybridTimeseriesFreqAIModel_tinhn(BasePyTorchRegressor):  # type: ignore
         # Persist references for saving/restoring via FreqAI
         self.freqai_trainer = trainer  # type: ignore[attr-defined]
         self.dk = dk
-        return trainer
+        # Return self so FreqAI/DataDrawer can call model.save(...)
+        return self
+
+    # --- Persistence API expected by FreqAI DataDrawer ---
+    def save(self, path: Any) -> None:  # type: ignore[override]
+        """Persist model weights, config, and scalers to disk.
+
+        FreqAI's DataDrawer calls `model.save(<path>)`. We accept str/Path.
+        """
+        if self.model is None or self.cfg is None:
+            raise RuntimeError("Cannot save before fitting the model.")
+        p = Path(path)
+        p.parent.mkdir(parents=True, exist_ok=True)
+        # Infer input_size from the LSTM layer
+        try:
+            input_size = int(getattr(self.model.lstm, "input_size"))  # type: ignore[attr-defined]
+        except Exception:
+            # Fallback: use last known feature count
+            input_size = len(self.feature_columns or [])
+        payload: Dict[str, Any] = {
+            "version": 1,
+            "cfg": asdict(self.cfg),
+            "feature_columns": self.feature_columns,
+            "label_columns": self.label_columns,
+            "input_size": input_size,
+            "state_dict": self.model.state_dict(),
+            "x_scaler": self.x_scaler,
+            "y_scaler": self.y_scaler,
+        }
+        torch.save(payload, p)
+
+    def load(self, path: Any) -> "HybridTimeseriesFreqAIModel_tinhn":  # type: ignore[override]
+        """Load model, config, and scalers from disk and return self."""
+        p = Path(path)
+        obj = torch.load(p, map_location="cpu")
+        # Restore config
+        cfg_dict = obj.get("cfg", {})
+        self.cfg = TrainConfig(**cfg_dict) if isinstance(cfg_dict, dict) else None
+        # Restore scalers and metadata
+        self.feature_columns = obj.get("feature_columns")
+        self.label_columns = obj.get("label_columns")
+        self.x_scaler = obj.get("x_scaler")
+        self.y_scaler = obj.get("y_scaler")
+        # Rebuild model and load weights
+        input_size = int(obj.get("input_size", 0))
+        if self.cfg is None or input_size <= 0:
+            raise RuntimeError("Invalid saved model payload: missing cfg or input_size")
+        cfg = self.cfg
+        self.model = HybridModel(
+            input_size=input_size,
+            horizon=cfg.horizon,
+            lstm_hidden=cfg.lstm_hidden,
+            lstm_layers=cfg.lstm_layers,
+            lstm_dropout=cfg.lstm_dropout,
+            bidirectional=cfg.bidirectional,
+            d_model=cfg.d_model,
+            nhead=cfg.nhead,
+            num_transformer_layers=cfg.num_transformer_layers,
+            ff_dim=cfg.ff_dim,
+            transformer_dropout=cfg.transformer_dropout,
+            pooling=cfg.pooling,
+            classification=cfg.classification,
+            capture_attention=cfg.capture_attention,
+        )
+        sd = obj.get("state_dict")
+        if sd is None:
+            raise RuntimeError("Saved payload missing 'state_dict'")
+        self.model.load_state_dict(sd)
+        # Set device lazily; will be moved in predict()
+        self.device = get_device()
+        return self
 
     def _prepare_inference_windows(self, feature_df: pd.DataFrame) -> Tuple[np.ndarray, List[Any]]:
         assert self.cfg is not None
