@@ -61,6 +61,13 @@ done
 echo "Running backtest..."
 mkdir -p /freqtrade/user_data/backtest_results
 EXPORT_PATH=/freqtrade/user_data/backtest_results/freqai_${EXPORT_TYPE}.json
+# Optional protections
+PROT_ARGS=()
+if [[ "${ENABLE_PROTECTIONS:-false}" == "true" ]]; then
+  echo "Enabling strategy protections for backtest"
+  PROT_ARGS+=("--enable-protections")
+fi
+
 freqtrade backtesting \
   --config "$CONFIG_TMP" \
   --strategy "$STRATEGY" \
@@ -68,7 +75,8 @@ freqtrade backtesting \
   --timerange "$TIMERANGE" \
   --cache day \
   --export "$EXPORT_TYPE" \
-  --export-filename "$EXPORT_PATH"
+  --export-filename "$EXPORT_PATH" \
+  "${PROT_ARGS[@]}"
 
 echo "Backtest finished. Results: $EXPORT_PATH"
 

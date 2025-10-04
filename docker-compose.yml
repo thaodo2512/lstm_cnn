@@ -124,6 +124,7 @@ services:
       FREQAI_DEVICE: cuda
       MPLBACKEND: Agg
       TIMERANGE: ${TIMERANGE:-20240101-20240201}
+      ENABLE_PROTECTIONS: ${ENABLE_PROTECTIONS:-false}
       # Strategy tuning (ichiV1)
       ICHI_STD_MULT: ${ICHI_STD_MULT:-0.5}
       ICHI_BULLISH_LEVEL: ${ICHI_BULLISH_LEVEL:-2}
@@ -140,13 +141,23 @@ services:
       - ./:/workspace
       - ./freqtrade_user_data:/freqtrade/user_data
     working_dir: /freqtrade
-    command: [
-      "freqtrade", "backtesting",
-      "--config", "/freqtrade/user_data/config.json",
-      "--freqaimodel", "HybridTimeseriesFreqAIModel_tinhn",
-      "--strategy", "ichiV1",
-      "--timerange", "${TIMERANGE:-20240101-20240201}"
-    ]
+    command:
+      - bash
+      - -lc
+      - |-
+        set -euo pipefail
+        ARGS=(
+          --config /freqtrade/user_data/config.json
+          --freqaimodel HybridTimeseriesFreqAIModel_tinhn
+          --strategy ichiV1
+          --timerange "${TIMERANGE:-20240101-20240201}"
+          --cache day
+        )
+        if [[ "${ENABLE_PROTECTIONS:-false}" == "true" ]]; then
+          echo "Enabling strategy protections (--enable-protections)"
+          ARGS+=(--enable-protections)
+        fi
+        exec freqtrade backtesting "${ARGS[@]}"
 
   # Backtest specific pairs via env PAIRS (comma-separated) using a temp config
   freqai-backtest-pairs-gpu-l4:
@@ -172,6 +183,7 @@ services:
       EXPORT_TYPE: ${EXPORT_TYPE:-trades}
       BLOCKS: ${BLOCKS:-1}
       BLOCK_DAYS: ${BLOCK_DAYS:-30}
+      ENABLE_PROTECTIONS: ${ENABLE_PROTECTIONS:-false}
       # Optional Telegram notify
       NOTIFY_TELEGRAM: ${NOTIFY_TELEGRAM:-false}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
