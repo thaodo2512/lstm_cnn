@@ -202,6 +202,11 @@ class ichiV1(IStrategy):
     def feature_engineering_standard(
         self, dataframe: DataFrame, metadata: dict, **kwargs
     ) -> DataFrame:
+        """Add Ichimoku and ensure EMA fan features exist.
+
+        Uses periods from freqai_info.feature_parameters.indicator_periods_candles
+        if available; falls back to [1, 3, 6, 12, 24, 48, 72, 96].
+        """
         if "date" in dataframe.columns:
             dataframe["%-day_of_week"] = (dataframe["date"].dt.dayofweek + 1) / 7
             dataframe["%-hour_of_day"] = (dataframe["date"].dt.hour + 1) / 25
@@ -230,7 +235,16 @@ class ichiV1(IStrategy):
             except Exception:
                 return series.ewm(span=max(1, n), adjust=False).mean()
 
-        for p in [1, 3, 6, 12, 24, 48, 72, 96]:
+        # Derive dynamic period list
+        periods = (
+            list(self.freqai_info.get("feature_parameters", {}).get("indicator_periods_candles", []))
+            if hasattr(self, "freqai_info") else []
+        )
+        if not periods:
+            periods = [1, 3, 6, 12, 24, 48, 72, 96]
+        periods = sorted(set(int(p) for p in periods))
+
+        for p in periods:
             # Prefer underscore naming; also support legacy hyphen names by aliasing
             ccol = f"%%-trend_close_period_{p}"
             ocol = f"%%-trend_open_period_{p}"
@@ -272,7 +286,9 @@ class ichiV1(IStrategy):
         if self._env_bool("ICHI_USE_HA", True):
             heikinashi = qtpylib.heikinashi(dataframe)
             dataframe["open"] = heikinashi["open"]
-            # dataframe['close'] = heikinashi['close']
+            # Optionally use HA close as well (disabled by default)
+            if self._env_bool("ICHI_USE_HA_CLOSE", False):
+                dataframe["close"] = heikinashi["close"]
             dataframe["high"] = heikinashi["high"]
             dataframe["low"] = heikinashi["low"]
 
@@ -326,7 +342,13 @@ class ichiV1(IStrategy):
         level = self._env_int(
             "ICHI_CLOUD_LEVEL", int(self.buy_params["buy_trend_above_senkou_level"])
         )
-        periods = [1, 3, 6, 12, 24, 48, 72, 96]
+        periods = (
+            list(self.freqai_info.get("feature_parameters", {}).get("indicator_periods_candles", []))
+            if hasattr(self, "freqai_info") else []
+        )
+        if not periods:
+            periods = [1, 3, 6, 12, 24, 48, 72, 96]
+        periods = sorted(set(int(p) for p in periods))
         for p in periods[: max(0, min(level, len(periods)))]:
             conditions.append(df[f"%%-trend_close_period_{p}"] > df["%%-senkou_a"])
             conditions.append(df[f"%%-trend_close_period_{p}"] > df["%%-senkou_b"])
@@ -356,6 +378,13 @@ class ichiV1(IStrategy):
         fm = df["%%-fan_magnitude"].ffill().fillna(1.0)
         for x in range(fan_shift):
             conditions.append(fm.shift(x + 1) < fm)
+
+        # Optional volume filter
+        if self._env_bool("ICHI_VOLUME_FILTER", False):
+            vol_win = max(1, self._env_int("ICHI_VOL_WINDOW", 20))
+            vol_mult = max(0.0, float(self._env_float("ICHI_VOL_MULT", 1.0)))
+            vol_ma = df["volume"].rolling(vol_win, min_periods=1).mean()
+            conditions.append(df["volume"] > vol_ma * vol_mult)
 
         if conditions:
             df.loc[reduce(lambda x, y: x & y, conditions), "enter_long"] = 1
@@ -420,7 +449,18 @@ class ichiV1(IStrategy):
             (df["close"] < kijun) if kijun is not None else pd.Series(False, index=df.index)
         )
 
-        cond_long = (ema_cross_down | ichi_cross_down | close_below_kijun)
+        # Exit mode: ema | ichi | kijun | any | all
+        exit_mode = self._env_str("ICHI_EXIT_MODE", "any").strip().lower()
+        if exit_mode == "ema":
+            cond_long = ema_cross_down
+        elif exit_mode in ("ichi", "tenkan_kijun_cross"):
+            cond_long = (ichi_cross_down | close_below_kijun)
+        elif exit_mode == "kijun":
+            cond_long = close_below_kijun
+        elif exit_mode == "all":
+            cond_long = (ema_cross_down & ichi_cross_down & close_below_kijun)
+        else:  # any
+            cond_long = (ema_cross_down | ichi_cross_down | close_below_kijun)
         df.loc[cond_long.fillna(False), "exit_long"] = 1
 
         # Short exit (optional via ICHI_ENABLE_SHORT): crossed above inverses
