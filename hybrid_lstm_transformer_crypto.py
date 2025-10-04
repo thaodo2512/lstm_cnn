@@ -1323,10 +1323,10 @@ class HybridTimeseriesFreqAIModel_tinhn(BasePyTorchRegressor):  # type: ignore
             return pred_df, dk.do_predict
         else:
             # Inverse model-specific scaler first (second stage)
-            if self.y_scaler is not None and len(preds_np) > 0:
-                preds_np = self.y_scaler.inverse_transform(preds_np)
+            if y_scaler is not None and len(preds_np) > 0:
+                preds_np = y_scaler.inverse_transform(preds_np)
 
-            columns = self.label_columns or ["&-prediction"]
+            columns = label_columns or ["&-prediction"]
             full_preds = np.zeros((total_len, len(columns)), dtype=np.float32)
             if len(end_indices) > 0 and len(preds_np) > 0:
                 # Place window-end predictions at their positions
