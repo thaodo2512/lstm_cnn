@@ -8,6 +8,7 @@ from __future__ import annotations
 # --- Do not remove these libs ---
 from freqtrade.strategy.interface import IStrategy
 from pandas import DataFrame
+import json
 import talib.abstract as ta  # type: ignore
 import freqtrade.vendor.qtpylib.indicators as qtpylib
 import pandas as pd  # noqa
@@ -283,6 +284,8 @@ class ichiV1(IStrategy):
 
     # -------------------- Strategy hooks --------------------
     def populate_indicators(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
+        # Log full runtime config once per pair/timeframe for debugging
+        self._log_config_once(metadata)
         if self._env_bool("ICHI_USE_HA", True):
             heikinashi = qtpylib.heikinashi(dataframe)
             dataframe["open"] = heikinashi["open"]
@@ -550,4 +553,80 @@ class ichiV1(IStrategy):
             self._debug_written_keys.add(key)
         except Exception:
             # Never interrupt strategy execution due to debugging
+            return
+
+    # ---------------- Config logging ----------------
+    _config_logged_keys: set = set()
+
+    def _log_config_once(self, metadata: dict) -> None:
+        """Print a compact view of ichiV1 configuration and env overrides once.
+
+        Toggle via env ICHI_LOG_CONFIG (default: true). Avoids log spam by logging
+        once per pair/timeframe.
+        """
+        if not self._env_bool("ICHI_LOG_CONFIG", True):
+            return
+        try:
+            pair = metadata.get("pair", "unknown_pair")
+            timeframe = getattr(self, "timeframe", "tf")
+            key = f"{pair}|{timeframe}"
+            if key in self._config_logged_keys:
+                return
+
+            # Pull dynamic periods for fan/trend
+            periods = (
+                list(self.freqai_info.get("feature_parameters", {}).get("indicator_periods_candles", []))
+                if hasattr(self, "freqai_info") else []
+            )
+            if not periods:
+                periods = [1, 3, 6, 12, 24, 48, 72, 96]
+
+            env_overrides = {
+                "ICHI_STD_MULT": self._env_float("ICHI_STD_MULT", 0.5),
+                "ICHI_CLOUD_LEVEL": self._env_int("ICHI_CLOUD_LEVEL", int(self.buy_params["buy_trend_above_senkou_level"])),
+                "ICHI_BULLISH_LEVEL": self._env_int("ICHI_BULLISH_LEVEL", int(self.buy_params["buy_trend_bullish_level"])),
+                "ICHI_FAN_SHIFT": self._env_int("ICHI_FAN_SHIFT", int(self.buy_params["buy_fan_magnitude_shift_value"])),
+                "ICHI_FAN_GAIN": self._env_float("ICHI_FAN_GAIN", float(self.buy_params["buy_min_fan_magnitude_gain"])),
+                "ICHI_REQUIRE_DOPREDICT": self._env_bool("ICHI_REQUIRE_DOPREDICT", True),
+                "ICHI_USE_HA": self._env_bool("ICHI_USE_HA", True),
+                "ICHI_USE_HA_CLOSE": self._env_bool("ICHI_USE_HA_CLOSE", False),
+                "ICHI_ENABLE_SHORT": self._env_bool("ICHI_ENABLE_SHORT", False),
+                "ICHI_TEST_LOOSE": self._env_bool("ICHI_TEST_LOOSE", False),
+                "ICHI_TEST_THR": self._env_float("ICHI_TEST_THR", 0.0),
+                "ICHI_SELL_TREND": self._env_str("ICHI_SELL_TREND", self.sell_params["sell_trend_indicator"]),
+                "ICHI_EXIT_MODE": self._env_str("ICHI_EXIT_MODE", "any"),
+                "ICHI_VOLUME_FILTER": self._env_bool("ICHI_VOLUME_FILTER", False),
+                "ICHI_VOL_WINDOW": self._env_int("ICHI_VOL_WINDOW", 20),
+                "ICHI_VOL_MULT": self._env_float("ICHI_VOL_MULT", 1.0),
+            }
+
+            freqai_cfg = getattr(self, "freqai_info", {})
+            cfg = {
+                "pair": pair,
+                "timeframe": timeframe,
+                "startup_candle_count": self.startup_candle_count,
+                "stoploss": self.stoploss,
+                "trailing": {
+                    "enabled": bool(self.trailing_stop),
+                    "positive": getattr(self, "trailing_stop_positive", None),
+                    "offset": getattr(self, "trailing_stop_positive_offset", None),
+                    "only_offset_reached": getattr(self, "trailing_only_offset_is_reached", None),
+                },
+                "minimal_roi": self.minimal_roi,
+                "can_short": bool(self.can_short),
+                "buy_params": self.buy_params,
+                "sell_params": self.sell_params,
+                "indicator_periods": periods,
+                "env_overrides": env_overrides,
+                "freqai_info": {
+                    k: freqai_cfg.get(k)
+                    for k in ("feature_parameters", "data_split_parameters", "fit_live_predictions_candles")
+                    if isinstance(freqai_cfg, dict)
+                },
+            }
+            payload = json.dumps(cfg, default=str, indent=2)
+            self.logger.info("ichiV1 config (%%s %%s) =>\n%%s", pair, timeframe, payload)
+            self._config_logged_keys.add(key)
+        except Exception:
+            # Never block execution due to logging issues
             return
