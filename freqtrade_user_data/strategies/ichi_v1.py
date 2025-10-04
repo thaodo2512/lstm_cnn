@@ -164,6 +164,22 @@ class ichiV1(IStrategy):
         dataframe["%%-cloud_green"] = ichimoku["cloud_green"]
         dataframe["%%-cloud_red"] = ichimoku["cloud_red"]
 
+        # Ensure required EMA fan columns exist even if expand_all hasn't populated them yet
+        def _ema(series: pd.Series, n: int) -> pd.Series:
+            try:
+                return ta.EMA(series, timeperiod=n)
+            except Exception:
+                return series.ewm(span=max(1, n), adjust=False).mean()
+
+        for p in [1, 3, 6, 12, 24, 48, 72, 96]:
+            ccol = f"%%-trend_close-period_{p}"
+            ocol = f"%%-trend_open-period_{p}"
+            if ccol not in dataframe.columns:
+                dataframe[ccol] = _ema(dataframe["close"], p)
+            if ocol not in dataframe.columns:
+                dataframe[ocol] = _ema(dataframe["open"], p)
+
+        # Fan magnitude and acceleration (safe if columns were just created)
         dataframe["%%-fan_magnitude"] = (
             dataframe["%%-trend_close-period_12"] / dataframe["%%-trend_close-period_96"]
         )
@@ -284,4 +300,3 @@ class ichiV1(IStrategy):
         )
         df.loc[cond.fillna(False), "exit_long"] = 1
         return df
-
