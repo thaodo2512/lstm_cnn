@@ -266,6 +266,24 @@ class ichiV1(IStrategy):
         if require_dp and "do_predict" in df.columns:
             conditions.append(df["do_predict"] == 1)
 
+        # Test mode: minimal gates to force trades for validation
+        if self._env_bool("ICHI_TEST_LOOSE", False):
+            thr = self._env_float("ICHI_TEST_THR", 0.0)
+            if "&-s_close" in df.columns:
+                long_cond = df["&-s_close"] > thr
+                short_cond = df["&-s_close"] < -thr
+            else:
+                # Fallback if prediction column missing: simple momentum
+                long_cond = df["close"] > df["close"].shift(1)
+                short_cond = df["close"] < df["close"].shift(1)
+            if require_dp and "do_predict" in df.columns:
+                long_cond = long_cond & (df["do_predict"] == 1)
+                short_cond = short_cond & (df["do_predict"] == 1)
+            df.loc[long_cond.fillna(False), "enter_long"] = 1
+            if self._env_bool("ICHI_ENABLE_SHORT", True):
+                df.loc[short_cond.fillna(False), "enter_short"] = 1
+            return df
+
         # Fallback for target statistics if not provided by FreqAI
         if "&-s_close_mean" not in df.columns or "&-s_close_std" not in df.columns:
             pred = df.get("&-s_close", pd.Series(np.nan, index=df.index))

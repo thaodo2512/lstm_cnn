@@ -133,6 +133,8 @@ services:
       ICHI_REQUIRE_DOPREDICT: ${ICHI_REQUIRE_DOPREDICT:-true}
       ICHI_USE_HA: ${ICHI_USE_HA:-true}
       ICHI_ENABLE_SHORT: ${ICHI_ENABLE_SHORT:-true}
+      ICHI_TEST_LOOSE: ${ICHI_TEST_LOOSE:-false}
+      ICHI_TEST_THR: ${ICHI_TEST_THR:-0.0}
     volumes:
       - ./:/workspace
       - ./freqtrade_user_data:/freqtrade/user_data
@@ -182,6 +184,8 @@ services:
       ICHI_REQUIRE_DOPREDICT: ${ICHI_REQUIRE_DOPREDICT:-true}
       ICHI_USE_HA: ${ICHI_USE_HA:-true}
       ICHI_ENABLE_SHORT: ${ICHI_ENABLE_SHORT:-true}
+      ICHI_TEST_LOOSE: ${ICHI_TEST_LOOSE:-false}
+      ICHI_TEST_THR: ${ICHI_TEST_THR:-0.0}
     volumes:
       - ./:/workspace
       - ./freqtrade_user_data:/freqtrade/user_data
@@ -223,6 +227,8 @@ services:
       ICHI_REQUIRE_DOPREDICT: ${ICHI_REQUIRE_DOPREDICT:-true}
       ICHI_USE_HA: ${ICHI_USE_HA:-true}
       ICHI_ENABLE_SHORT: ${ICHI_ENABLE_SHORT:-true}
+      ICHI_TEST_LOOSE: ${ICHI_TEST_LOOSE:-false}
+      ICHI_TEST_THR: ${ICHI_TEST_THR:-0.0}
     volumes:
       - ./:/workspace
       - ./freqtrade_user_data:/freqtrade/user_data

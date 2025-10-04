@@ -63,6 +63,12 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 - feat(strategy): Add runtime short toggle `ICHI_ENABLE_SHORT` to ichiV1 (default true).
 - chore(compose/.env): Plumb `ICHI_ENABLE_SHORT` into compose and document in `.env.example`.
 
+## [0.1.35] - 2025-10-04
+### Added
+- feat(strategy): Add `ICHI_TEST_LOOSE` and `ICHI_TEST_THR` to force entries for validation.
+  - Test mode sets long when `&-s_close > thr` and short when `< -thr` (or simple momentum fallback).
+- chore(compose/.env): Expose test-mode envs in compose; document in `.env.example`.
+
 ## [0.1.25] - 2025-10-03
 ### Performance
 - perf(freqai): Add a fast GPU profile for backtesting/training.
