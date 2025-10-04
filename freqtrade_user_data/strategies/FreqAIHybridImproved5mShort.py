@@ -162,11 +162,12 @@ class FreqAIHybridImproved5mShort(IStrategy):
             inf = self.dp.get_pair_dataframe(pair=metadata["pair"], timeframe=self.informative_timeframe)
             inf["ema_trend"] = self._ema(inf["close"], int(self.ema_period.value))
             inf["rsi"] = self._rsi(inf["close"], 14)
+            # Use positional args for broader Freqtrade compatibility
             dataframe = merge_informative_pair(
-                base=dataframe,
-                informative=inf,
-                base_timeframe=self.timeframe,
-                informative_timeframe=self.informative_timeframe,
+                dataframe,
+                inf,
+                self.timeframe,
+                self.informative_timeframe,
                 ffill=True,
             )
             dataframe.rename(
