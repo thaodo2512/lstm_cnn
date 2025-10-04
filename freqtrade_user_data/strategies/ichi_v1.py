@@ -263,9 +263,23 @@ class ichiV1(IStrategy):
                     dataframe[ocol] = _ema(dataframe["open"], p)
 
         # Fan magnitude and acceleration (safe if columns were just created)
+        # Use nearest available periods to defaults fast=12, slow=96
+        def _nearest(target: int, avail: list[int]) -> int:
+            if target in avail:
+                return target
+            return min(avail, key=lambda x: abs(x - target)) if avail else target
+
+        p_fast = _nearest(12, periods)
+        p_slow = _nearest(96, periods)
+        # Avoid identical periods (choose max as slow, min as fast)
+        if p_fast == p_slow and periods:
+            p_fast = min(periods)
+            p_slow = max(periods)
+        fast_col = f"%%-trend_close_period_{p_fast}"
+        slow_col = f"%%-trend_close_period_{p_slow}"
         # Guard against zero/NaN denominator
-        den = dataframe["%%-trend_close_period_96"].replace(0, 1e-8)
-        dataframe["%%-fan_magnitude"] = dataframe["%%-trend_close_period_12"] / den
+        den = dataframe[slow_col].replace(0, 1e-8)
+        dataframe["%%-fan_magnitude"] = dataframe[fast_col] / den
         dataframe["%%-fan_magnitude_gain"] = (
             dataframe["%%-fan_magnitude"] / dataframe["%%-fan_magnitude"].shift(1)
         )
@@ -438,8 +452,23 @@ class ichiV1(IStrategy):
         )
 
         # EMA trend cross (legacy)
+        # Map requested periods to nearest available to avoid KeyErrors when
+        # indicator_periods_candles does not include exact values like 1 or 24
+        periods = (
+            list(self.freqai_info.get("feature_parameters", {}).get("indicator_periods_candles", []))
+            if hasattr(self, "freqai_info") else []
+        )
+        if not periods:
+            periods = [1, 3, 6, 12, 24, 48, 72, 96]
+        periods = sorted(set(int(p) for p in periods))
+        def _nearest(target: int, avail: list[int]) -> int:
+            if target in avail:
+                return target
+            return min(avail, key=lambda x: abs(x - target)) if avail else target
+        p_fast = _nearest(1, periods)
+        p_slow = _nearest(period, periods)
         ema_cross_down = qtpylib.crossed_below(
-            df["%%-trend_close_period_1"], df[f"%%-trend_close_period_{period}"]
+            df[f"%%-trend_close_period_{p_fast}"], df[f"%%-trend_close_period_{p_slow}"]
         )
 
         # Ichimoku exits: Tenkan crosses below Kijun OR close below Kijun
@@ -469,7 +498,7 @@ class ichiV1(IStrategy):
         # Short exit (optional via ICHI_ENABLE_SHORT): crossed above inverses
         if self._env_bool("ICHI_ENABLE_SHORT", True):
             ema_cross_up = qtpylib.crossed_above(
-                df["%%-trend_close_period_1"], df[f"%%-trend_close_period_{period}"]
+                df[f"%%-trend_close_period_{p_fast}"], df[f"%%-trend_close_period_{p_slow}"]
             )
             ichi_cross_up = (
                 qtpylib.crossed_above(tenkan, kijun) if tenkan is not None and kijun is not None else pd.Series(False, index=df.index)
