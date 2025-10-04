@@ -1106,13 +1106,19 @@ class HybridTimeseriesFreqAIModel_tinhn(BasePyTorchRegressor):  # type: ignore
 
         cfg = self.cfg
         base_model = self.model
-        # unwrap saved trainer wrappers (BasePyTorchRegressor saves wrapper objects via DataDrawer)
+        # unwrap saved trainer wrappers (BasePyTorchRegressor may wrap torch model)
         torch_model = base_model.model if hasattr(base_model, "model") else base_model  # type: ignore[assignment]
         # Normalize device type to torch.device
         if isinstance(self.device, str):
             device = torch.device(self.device)
         else:
             device = self.device or get_device()
+
+        # Ensure model is on the selected device
+        try:
+            torch_model.to(device)  # type: ignore[operator]
+        except Exception:
+            pass
 
         # 1) Build feature dataframe via DK (ensures same feature list as training)
         try:
