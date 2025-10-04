@@ -58,6 +58,11 @@ The format is based on Keep a Changelog, and this project adheres to Semantic Ve
 - docs: Add `.env.example` with common Compose envs and ichiV1 tunables (`ICHI_*`).
 - chore(compose): Expose `ICHI_*` envs in backtest and signal-bot services for quick tuning without code changes.
 
+## [0.1.34] - 2025-10-04
+### Added
+- feat(strategy): Add runtime short toggle `ICHI_ENABLE_SHORT` to ichiV1 (default true).
+- chore(compose/.env): Plumb `ICHI_ENABLE_SHORT` into compose and document in `.env.example`.
+
 ## [0.1.25] - 2025-10-03
 ### Performance
 - perf(freqai): Add a fast GPU profile for backtesting/training.

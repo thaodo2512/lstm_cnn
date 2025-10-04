@@ -348,68 +348,69 @@ class ichiV1(IStrategy):
         if conditions:
             df.loc[reduce(lambda x, y: x & y, conditions), "enter_long"] = 1
 
-        # ---------------- Short entry (mirrors long, inverted) ----------------
-        short_conditions = []
-        if require_dp and "do_predict" in df.columns:
-            short_conditions.append(df["do_predict"] == 1)
+        # ---------------- Short entry (optional via ICHI_ENABLE_SHORT) ----------------
+        if self._env_bool("ICHI_ENABLE_SHORT", True):
+            short_conditions = []
+            if require_dp and "do_predict" in df.columns:
+                short_conditions.append(df["do_predict"] == 1)
 
-        # Use same computed target_roi magnitude, require negative pred less than -target
-        if "&-s_close" in df.columns:
-            short_conditions.append(df["&-s_close"] < -df["target_roi"])
+            # Use same computed target_roi magnitude, require negative pred less than -target
+            if "&-s_close" in df.columns:
+                short_conditions.append(df["&-s_close"] < -df["target_roi"])
 
-        # Below cloud by level
-        if level >= 1:
-            short_conditions.append(df["%%-trend_close_period_1"] < df["%%-senkou_a"])
-            short_conditions.append(df["%%-trend_close_period_1"] < df["%%-senkou_b"])
-        if level >= 2:
-            short_conditions.append(df["%%-trend_close_period_3"] < df["%%-senkou_a"])
-            short_conditions.append(df["%%-trend_close_period_3"] < df["%%-senkou_b"])
-        if level >= 3:
-            short_conditions.append(df["%%-trend_close_period_6"] < df["%%-senkou_a"])
-            short_conditions.append(df["%%-trend_close_period_6"] < df["%%-senkou_b"])
-        if level >= 4:
-            short_conditions.append(df["%%-trend_close_period_12"] < df["%%-senkou_a"])
-            short_conditions.append(df["%%-trend_close_period_12"] < df["%%-senkou_b"])
-        if level >= 5:
-            short_conditions.append(df["%%-trend_close_period_24"] < df["%%-senkou_a"])
-            short_conditions.append(df["%%-trend_close_period_24"] < df["%%-senkou_b"])
-        if level >= 6:
-            short_conditions.append(df["%%-trend_close_period_48"] < df["%%-senkou_a"])
-            short_conditions.append(df["%%-trend_close_period_48"] < df["%%-senkou_b"])
-        if level >= 7:
-            short_conditions.append(df["%%-trend_close_period_72"] < df["%%-senkou_a"])
-            short_conditions.append(df["%%-trend_close_period_72"] < df["%%-senkou_b"])
-        if level >= 8:
-            short_conditions.append(df["%%-trend_close_period_96"] < df["%%-senkou_a"])
-            short_conditions.append(df["%%-trend_close_period_96"] < df["%%-senkou_b"])
+            # Below cloud by level
+            if level >= 1:
+                short_conditions.append(df["%%-trend_close_period_1"] < df["%%-senkou_a"])
+                short_conditions.append(df["%%-trend_close_period_1"] < df["%%-senkou_b"])
+            if level >= 2:
+                short_conditions.append(df["%%-trend_close_period_3"] < df["%%-senkou_a"])
+                short_conditions.append(df["%%-trend_close_period_3"] < df["%%-senkou_b"])
+            if level >= 3:
+                short_conditions.append(df["%%-trend_close_period_6"] < df["%%-senkou_a"])
+                short_conditions.append(df["%%-trend_close_period_6"] < df["%%-senkou_b"])
+            if level >= 4:
+                short_conditions.append(df["%%-trend_close_period_12"] < df["%%-senkou_a"])
+                short_conditions.append(df["%%-trend_close_period_12"] < df["%%-senkou_b"])
+            if level >= 5:
+                short_conditions.append(df["%%-trend_close_period_24"] < df["%%-senkou_a"])
+                short_conditions.append(df["%%-trend_close_period_24"] < df["%%-senkou_b"])
+            if level >= 6:
+                short_conditions.append(df["%%-trend_close_period_48"] < df["%%-senkou_a"])
+                short_conditions.append(df["%%-trend_close_period_48"] < df["%%-senkou_b"])
+            if level >= 7:
+                short_conditions.append(df["%%-trend_close_period_72"] < df["%%-senkou_a"])
+                short_conditions.append(df["%%-trend_close_period_72"] < df["%%-senkou_b"])
+            if level >= 8:
+                short_conditions.append(df["%%-trend_close_period_96"] < df["%%-senkou_a"])
+                short_conditions.append(df["%%-trend_close_period_96"] < df["%%-senkou_b"])
 
-        # Bearish EMAs (close EMA below open EMA)
-        if bull_level >= 1:
-            short_conditions.append(df["%%-trend_close_period_1"] < df["%%-trend_open_period_1"])
-        if bull_level >= 2:
-            short_conditions.append(df["%%-trend_close_period_3"] < df["%%-trend_open_period_3"])
-        if bull_level >= 3:
-            short_conditions.append(df["%%-trend_close_period_6"] < df["%%-trend_open_period_6"])
-        if bull_level >= 4:
-            short_conditions.append(df["%%-trend_close_period_12"] < df["%%-trend_open_period_12"])
-        if bull_level >= 5:
-            short_conditions.append(df["%%-trend_close_period_24"] < df["%%-trend_open_period_24"])
-        if bull_level >= 6:
-            short_conditions.append(df["%%-trend_close_period_48"] < df["%%-trend_open_period_48"])
-        if bull_level >= 7:
-            short_conditions.append(df["%%-trend_close_period_72"] < df["%%-trend_open_period_72"])
-        if bull_level >= 8:
-            short_conditions.append(df["%%-trend_close_period_96"] < df["%%-trend_open_period_96"])
+            # Bearish EMAs (close EMA below open EMA)
+            if bull_level >= 1:
+                short_conditions.append(df["%%-trend_close_period_1"] < df["%%-trend_open_period_1"])
+            if bull_level >= 2:
+                short_conditions.append(df["%%-trend_close_period_3"] < df["%%-trend_open_period_3"])
+            if bull_level >= 3:
+                short_conditions.append(df["%%-trend_close_period_6"] < df["%%-trend_open_period_6"])
+            if bull_level >= 4:
+                short_conditions.append(df["%%-trend_close_period_12"] < df["%%-trend_open_period_12"])
+            if bull_level >= 5:
+                short_conditions.append(df["%%-trend_close_period_24"] < df["%%-trend_open_period_24"])
+            if bull_level >= 6:
+                short_conditions.append(df["%%-trend_close_period_48"] < df["%%-trend_open_period_48"])
+            if bull_level >= 7:
+                short_conditions.append(df["%%-trend_close_period_72"] < df["%%-trend_open_period_72"])
+            if bull_level >= 8:
+                short_conditions.append(df["%%-trend_close_period_96"] < df["%%-trend_open_period_96"])
 
-        # Fan decreasing and below 1
-        short_conditions.append(df["%%-fan_magnitude"] < 1)
-        # Mirror gain threshold: require contraction
-        short_conditions.append(df["%%-fan_magnitude_gain"] <= (1.0 / max(1e-6, fan_gain)))
-        for x in range(fan_shift):
-            short_conditions.append(df["%%-fan_magnitude"].shift(x + 1) > df["%%-fan_magnitude"])
+            # Fan decreasing and below 1
+            short_conditions.append(df["%%-fan_magnitude"] < 1)
+            # Mirror gain threshold: require contraction
+            short_conditions.append(df["%%-fan_magnitude_gain"] <= (1.0 / max(1e-6, fan_gain)))
+            for x in range(fan_shift):
+                short_conditions.append(df["%%-fan_magnitude"].shift(x + 1) > df["%%-fan_magnitude"])
 
-        if short_conditions:
-            df.loc[reduce(lambda x, y: x & y, short_conditions), "enter_short"] = 1
+            if short_conditions:
+                df.loc[reduce(lambda x, y: x & y, short_conditions), "enter_short"] = 1
 
         return df
 
@@ -424,9 +425,10 @@ class ichiV1(IStrategy):
             df["%%-trend_close_period_1"], df[f"%%-trend_close_period_{period}"]
         )
         df.loc[cond.fillna(False), "exit_long"] = 1
-        # Short exit: crossed above (inverse of long exit)
-        cond_s = qtpylib.crossed_above(
-            df["%%-trend_close_period_1"], df[f"%%-trend_close_period_{period}"]
-        )
-        df.loc[cond_s.fillna(False), "exit_short"] = 1
+        # Short exit (optional via ICHI_ENABLE_SHORT): crossed above inverse
+        if self._env_bool("ICHI_ENABLE_SHORT", True):
+            cond_s = qtpylib.crossed_above(
+                df["%%-trend_close_period_1"], df[f"%%-trend_close_period_{period}"]
+            )
+            df.loc[cond_s.fillna(False), "exit_short"] = 1
         return df

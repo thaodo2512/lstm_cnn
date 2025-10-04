@@ -132,6 +132,7 @@ services:
       ICHI_FAN_GAIN: ${ICHI_FAN_GAIN:-1.001}
       ICHI_REQUIRE_DOPREDICT: ${ICHI_REQUIRE_DOPREDICT:-true}
       ICHI_USE_HA: ${ICHI_USE_HA:-true}
+      ICHI_ENABLE_SHORT: ${ICHI_ENABLE_SHORT:-true}
     volumes:
       - ./:/workspace
       - ./freqtrade_user_data:/freqtrade/user_data
@@ -180,6 +181,7 @@ services:
       ICHI_FAN_GAIN: ${ICHI_FAN_GAIN:-1.001}
       ICHI_REQUIRE_DOPREDICT: ${ICHI_REQUIRE_DOPREDICT:-true}
       ICHI_USE_HA: ${ICHI_USE_HA:-true}
+      ICHI_ENABLE_SHORT: ${ICHI_ENABLE_SHORT:-true}
     volumes:
       - ./:/workspace
       - ./freqtrade_user_data:/freqtrade/user_data
@@ -220,6 +222,7 @@ services:
       ICHI_FAN_GAIN: ${ICHI_FAN_GAIN:-1.001}
       ICHI_REQUIRE_DOPREDICT: ${ICHI_REQUIRE_DOPREDICT:-true}
       ICHI_USE_HA: ${ICHI_USE_HA:-true}
+      ICHI_ENABLE_SHORT: ${ICHI_ENABLE_SHORT:-true}
     volumes:
       - ./:/workspace
       - ./freqtrade_user_data:/freqtrade/user_data
