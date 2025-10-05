@@ -315,22 +315,22 @@ services:
         freqtrade install-ui || true;
         # Create a temporary config that aligns strategy/model with .env
         python - <<'PY'
-import json, os
-src = '/freqtrade/user_data/config.json'
-dst = '/tmp/config_webui.json'
-with open(src) as f:
-    conf = json.load(f)
-# Apply STRATEGY / FREQAIMODEL from env if set
-strategy = os.environ.get('STRATEGY')
-model = os.environ.get('FREQAIMODEL')
-if strategy:
-    conf['strategy'] = strategy
-if model:
-    conf['freqaimodel'] = model
-with open(dst,'w') as f:
-    json.dump(conf, f, indent=2)
-print(f'Wrote WebUI config to {dst} (strategy={conf.get("strategy")}, model={conf.get("freqaimodel")})')
-PY
+        import json, os
+        src = '/freqtrade/user_data/config.json'
+        dst = '/tmp/config_webui.json'
+        with open(src) as f:
+            conf = json.load(f)
+        # Apply STRATEGY / FREQAIMODEL from env if set
+        strategy = os.environ.get('STRATEGY')
+        model = os.environ.get('FREQAIMODEL')
+        if strategy:
+            conf['strategy'] = strategy
+        if model:
+            conf['freqaimodel'] = model
+        with open(dst,'w') as f:
+            json.dump(conf, f, indent=2)
+        print(f'Wrote WebUI config to {dst} (strategy={conf.get("strategy")}, model={conf.get("freqaimodel")})')
+        PY
         exec freqtrade webserver --config /tmp/config_webui.json
 
   # Optional: classification run example (commented). Enable by uncommenting.
