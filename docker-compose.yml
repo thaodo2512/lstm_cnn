@@ -69,6 +69,8 @@ services:
       # Strategy / Model (overridable via .env)
       STRATEGY: ${STRATEGY:-ichiV1}
       FREQAIMODEL: ${FREQAIMODEL:-HybridTimeseriesFreqAIModel_tinhn}
+      # Pairs override (comma-separated) for training/backtest
+      PAIRS: ${PAIRS:-BTC/USDT:USDT,ETH/USDT:USDT}
       TIMERANGE: ${TIMERANGE:-20240101-20240201}
       # Block download config
       TIMEFRAMES: ${TIMEFRAMES:-1h}
@@ -93,22 +95,40 @@ services:
         (pip install --no-cache-dir -U six && pip install --no-cache-dir stable-baselines3 sb3-contrib) || true;
         echo "TIMEFRAMES=${TIMEFRAMES:-1h} TIMERANGE=${TIMERANGE:-20240101-20250930} BLOCKS=${BLOCKS:-3} BLOCK_DAYS=${BLOCK_DAYS:-30}";
         echo "Before download - available data:";
+        # If PAIRS env provided, build a temporary config with that whitelist
+        CFG_IN="/freqtrade/user_data/config.json"; CFG_TMP="/tmp/config_train.json"; CFG="$CFG_IN";
+        if [[ -n "${PAIRS:-}" ]]; then
+          python - <<'PY'
+import json, os
+src = "/freqtrade/user_data/config.json"; dst = "/tmp/config_train.json"
+pairs_raw = os.environ.get("PAIRS", "")
+pairs = [p.strip() for p in pairs_raw.split(',') if p.strip()]
+conf = json.load(open(src))
+if pairs:
+    conf.setdefault('exchange', {}).setdefault('pair_whitelist', [])
+    conf['exchange']['pair_whitelist'] = pairs
+with open(dst,'w') as f:
+    json.dump(conf, f, indent=2)
+print(f"Wrote temp train config {dst} with {len(pairs)} pairs")
+PY
+          CFG="$CFG_TMP"
+        fi
         # list-data may not accept --timeframes in this Freqtrade version; show all timeranges
-        freqtrade list-data --config /freqtrade/user_data/config.json --show-timerange || true;
+        freqtrade list-data --config "$CFG" --show-timerange || true;
         # Ensure data for all requested timeframes (handles comma-separated lists)
         bash /workspace/scripts/ensure_data_for_timeframes.sh \
-          /freqtrade/user_data/config.json \
+          "$CFG" \
           "${TIMEFRAMES:-1h}" \
           "${TIMERANGE:-20240101-20250930}" \
           "${BLOCKS:-3}" \
           "${BLOCK_DAYS:-30}";
         echo "After download - available data:";
-        freqtrade list-data --config /freqtrade/user_data/config.json --show-timerange || true;
+        freqtrade list-data --config "$CFG" --show-timerange || true;
         mkdir -p /freqtrade/user_data/backtest_results;
         freqtrade backtesting \
           --strategy "${STRATEGY:-ichiV1}" \
           --freqaimodel "${FREQAIMODEL:-HybridTimeseriesFreqAIModel_tinhn}" \
-          --config /freqtrade/user_data/config.json \
+          --config "$CFG" \
           --timerange "${TIMERANGE:-20240101-20250930}" \
           --cache day \
           --export trades \
