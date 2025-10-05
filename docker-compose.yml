@@ -149,6 +149,8 @@ PY
       PYTHONPATH: /workspace
       FREQAI_DEVICE: cuda
       MPLBACKEND: Agg
+      # Pairs override for backtest (optional)
+      PAIRS: ${PAIRS:-}
       # Strategy / Model (overridable via .env)
       STRATEGY: ${STRATEGY:-ichiV1}
       FREQAIMODEL: ${FREQAIMODEL:-HybridTimeseriesFreqAIModel_tinhn}
@@ -184,8 +186,26 @@ PY
           echo "Enabling strategy protections (--enable-protections)"
           PROT="--enable-protections"
         fi
+        # If PAIRS env provided, build a temporary config with that whitelist
+        CFG_IN="/freqtrade/user_data/config.json"; CFG_TMP="/tmp/config_backtest.json"; CFG="$CFG_IN";
+        if [[ -n "${PAIRS:-}" ]]; then
+          python - <<'PY'
+import json, os
+src = "/freqtrade/user_data/config.json"; dst = "/tmp/config_backtest.json"
+pairs_raw = os.environ.get("PAIRS", "")
+pairs = [p.strip() for p in pairs_raw.split(',') if p.strip()]
+conf = json.load(open(src))
+if pairs:
+    conf.setdefault('exchange', {}).setdefault('pair_whitelist', [])
+    conf['exchange']['pair_whitelist'] = pairs
+with open(dst,'w') as f:
+    json.dump(conf, f, indent=2)
+print(f"Wrote temp backtest config {dst} with {len(pairs)} pairs")
+PY
+          CFG="$CFG_TMP"
+        fi
         exec freqtrade backtesting \
-          --config /freqtrade/user_data/config.json \
+          --config "$CFG" \
           --freqaimodel "${FREQAIMODEL:-HybridTimeseriesFreqAIModel_tinhn}" \
           --strategy "${STRATEGY:-ichiV1}" \
           --timerange "${TIMERANGE:-20240101-20240201}" \
