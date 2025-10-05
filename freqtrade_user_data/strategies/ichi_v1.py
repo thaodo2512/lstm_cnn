@@ -400,8 +400,12 @@ class ichiV1(IStrategy):
             if require_dp and "do_predict" in df.columns:
                 short_conditions.append(df["do_predict"] == 1)
 
-            # Use same computed target_roi magnitude, require negative pred less than -target
-            if "&-s_close" in df.columns:
+            # Use same computed target_roi magnitude only if thresholding is enabled
+            if (
+                self._env_bool("ICHI_USE_PRED_THRESHOLD", False)
+                and "&-s_close" in df.columns
+                and "target_roi" in df.columns
+            ):
                 short_conditions.append(df["&-s_close"] < -df["target_roi"])
 
             # Below cloud by level
