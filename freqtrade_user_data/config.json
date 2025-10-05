@@ -75,6 +75,7 @@
     "identifier": "BTC_fast",
     "train_period_days": 90,
     "backtest_period_days": 30,
+    "live_retrain_hours": 24,
     "feature_parameters": {
       "include_timeframes": [
         "5m",
