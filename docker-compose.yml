@@ -95,10 +95,13 @@ services:
         echo "Before download - available data:";
         # list-data may not accept --timeframes in this Freqtrade version; show all timeranges
         freqtrade list-data --config /freqtrade/user_data/config.json --show-timerange || true;
-        # Ensure backtest-range data exists
-        freqtrade download-data --config /freqtrade/user_data/config.json -t "${TIMEFRAMES:-1h}" --timerange "${TIMERANGE:-20240101-20250930}";
-        # Ensure pre-start history exists for FreqAI training windows
-        bash /workspace/scripts/freqtrade_download_prestart_blocks.sh /freqtrade/user_data/config.json "${TIMEFRAMES:-1h}" "${TIMERANGE:-20240101-20250930}" "${BLOCKS:-3}" "${BLOCK_DAYS:-30}";
+        # Ensure data for all requested timeframes (handles comma-separated lists)
+        bash /workspace/scripts/ensure_data_for_timeframes.sh \
+          /freqtrade/user_data/config.json \
+          "${TIMEFRAMES:-1h}" \
+          "${TIMERANGE:-20240101-20250930}" \
+          "${BLOCKS:-3}" \
+          "${BLOCK_DAYS:-30}";
         echo "After download - available data:";
         freqtrade list-data --config /freqtrade/user_data/config.json --show-timerange || true;
         mkdir -p /freqtrade/user_data/backtest_results;
@@ -167,7 +170,7 @@ services:
           --strategy "${STRATEGY:-ichiV1}" \
           --timerange "${TIMERANGE:-20240101-20240201}" \
           --cache day \
-          $PROT
+          $$PROT
 
   # Backtest specific pairs via env PAIRS (comma-separated) using a temp config
   freqai-backtest-pairs-gpu-l4:
