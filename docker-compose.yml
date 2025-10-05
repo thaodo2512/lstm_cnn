@@ -99,9 +99,7 @@ services:
         CFG_IN="/freqtrade/user_data/config.json"; CFG_TMP="/tmp/config_train.json"; CFG="$CFG_IN";
         if [[ -n "${PAIRS:-}" ]]; then
           python -c 'import json,os; src="/freqtrade/user_data/config.json"; dst="/tmp/config_train.json"; pairs=[p.strip() for p in os.environ.get("PAIRS","").split(",") if p.strip()]; conf=json.load(open(src));
-if pairs:
-    conf.setdefault("exchange", {}).setdefault("pair_whitelist", []);
-    conf["exchange"]["pair_whitelist"]=pairs
+if pairs: conf.setdefault("exchange", {}).setdefault("pair_whitelist", []); conf["exchange"]["pair_whitelist"]=pairs
 open(dst,"w").write(json.dumps(conf, indent=2)); print(f"Wrote temp train config {dst} with {len(pairs)} pairs")'
           CFG="$CFG_TMP"
         fi
@@ -182,9 +180,7 @@ open(dst,"w").write(json.dumps(conf, indent=2)); print(f"Wrote temp train config
         CFG_IN="/freqtrade/user_data/config.json"; CFG_TMP="/tmp/config_backtest.json"; CFG="$CFG_IN";
         if [[ -n "${PAIRS:-}" ]]; then
           python -c 'import json,os; src="/freqtrade/user_data/config.json"; dst="/tmp/config_backtest.json"; pairs=[p.strip() for p in os.environ.get("PAIRS","").split(",") if p.strip()]; conf=json.load(open(src));
-if pairs:
-    conf.setdefault("exchange", {}).setdefault("pair_whitelist", []);
-    conf["exchange"]["pair_whitelist"]=pairs
+if pairs: conf.setdefault("exchange", {}).setdefault("pair_whitelist", []); conf["exchange"]["pair_whitelist"]=pairs
 open(dst,"w").write(json.dumps(conf, indent=2)); print(f"Wrote temp backtest config {dst} with {len(pairs)} pairs")'
           CFG="$CFG_TMP"
         fi
@@ -341,14 +337,11 @@ open(dst,"w").write(json.dumps(conf, indent=2)); print(f"Wrote temp backtest con
         echo "Installing Freqtrade UI assets (if not present)...";
         freqtrade install-ui || true;
         # Create a temporary config that aligns strategy/model (and pairs) with .env
-        python -c 'import json,os; src="/freqtrade/user_data/config.json"; dst="/tmp/config_webui.json"; conf=json.load(open(src));
-strategy=os.environ.get("STRATEGY"); model=os.environ.get("FREQAIMODEL"); pairs=[p.strip() for p in os.environ.get("PAIRS","" ).split(",") if p.strip()];
+        python -c 'import json,os; src="/freqtrade/user_data/config.json"; dst="/tmp/config_webui.json"; conf=json.load(open(src)); strategy=os.environ.get("STRATEGY"); model=os.environ.get("FREQAIMODEL"); pairs=[p.strip() for p in os.environ.get("PAIRS","" ).split(",") if p.strip()];
 if strategy: conf["strategy"]=strategy
 if model: conf["freqaimodel"]=model
-if pairs:
-    conf.setdefault("exchange", {}).setdefault("pair_whitelist", []);
-    conf["exchange"]["pair_whitelist"]=pairs
-open(dst,"w").write(json.dumps(conf, indent=2)); print(f"Wrote WebUI config to {dst} (strategy={conf.get('strategy')}, model={conf.get('freqaimodel')}, pairs={len(conf.get('exchange',{}).get('pair_whitelist',[]))})" )'
+if pairs: conf.setdefault("exchange", {}).setdefault("pair_whitelist", []); conf["exchange"]["pair_whitelist"]=pairs
+open(dst,"w").write(json.dumps(conf, indent=2)); print(f"Wrote WebUI config to {dst} (strategy={conf.get('strategy')}, model={conf.get('freqaimodel')}, pairs={len(conf.get('exchange',{}).get('pair_whitelist',[]))})")'
         exec freqtrade webserver --config /tmp/config_webui.json
 
   # Optional: classification run example (commented). Enable by uncommenting.
