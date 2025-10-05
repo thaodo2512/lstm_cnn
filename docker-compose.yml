@@ -66,6 +66,9 @@ services:
       MPLBACKEND: Agg
       FREQAI_DEVICE: cuda
       PYTHONPATH: /workspace
+      # Strategy / Model (overridable via .env)
+      STRATEGY: ${STRATEGY:-ichiV1}
+      FREQAIMODEL: ${FREQAIMODEL:-HybridTimeseriesFreqAIModel_tinhn}
       TIMERANGE: ${TIMERANGE:-20240101-20240201}
       # Block download config
       TIMEFRAMES: ${TIMEFRAMES:-1h}
@@ -100,8 +103,8 @@ services:
         freqtrade list-data --config /freqtrade/user_data/config.json --show-timerange || true;
         mkdir -p /freqtrade/user_data/backtest_results;
         freqtrade backtesting \
-          --strategy ichiV1 \
-          --freqaimodel HybridTimeseriesFreqAIModel_tinhn \
+          --strategy "${STRATEGY:-ichiV1}" \
+          --freqaimodel "${FREQAIMODEL:-HybridTimeseriesFreqAIModel_tinhn}" \
           --config /freqtrade/user_data/config.json \
           --timerange "${TIMERANGE:-20240101-20250930}" \
           --cache day \
@@ -123,6 +126,9 @@ services:
       PYTHONPATH: /workspace
       FREQAI_DEVICE: cuda
       MPLBACKEND: Agg
+      # Strategy / Model (overridable via .env)
+      STRATEGY: ${STRATEGY:-ichiV1}
+      FREQAIMODEL: ${FREQAIMODEL:-HybridTimeseriesFreqAIModel_tinhn}
       TIMERANGE: ${TIMERANGE:-20240101-20240201}
       ENABLE_PROTECTIONS: ${ENABLE_PROTECTIONS:-false}
       # Strategy tuning (ichiV1)
@@ -157,8 +163,8 @@ services:
         fi
         exec freqtrade backtesting \
           --config /freqtrade/user_data/config.json \
-          --freqaimodel HybridTimeseriesFreqAIModel_tinhn \
-          --strategy ichiV1 \
+          --freqaimodel "${FREQAIMODEL:-HybridTimeseriesFreqAIModel_tinhn}" \
+          --strategy "${STRATEGY:-ichiV1}" \
           --timerange "${TIMERANGE:-20240101-20240201}" \
           --cache day \
           $PROT
@@ -280,6 +286,9 @@ services:
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: compute,utility
       FREQAI_DEVICE: cuda
+      # Strategy / Model for WebUI defaults
+      STRATEGY: ${STRATEGY:-ichiV1}
+      FREQAIMODEL: ${FREQAIMODEL:-HybridTimeseriesFreqAIModel_tinhn}
       TIMEFRAMES_WEBUI: ${TIMEFRAMES_WEBUI:-1h,5m}
       TIMERANGE: ${TIMERANGE:-20240101-20250930}
       BLOCKS: ${BLOCKS:-3}
@@ -304,7 +313,25 @@ services:
           "${BLOCK_DAYS:-30}";
         echo "Installing Freqtrade UI assets (if not present)...";
         freqtrade install-ui || true;
-        exec freqtrade webserver --config /freqtrade/user_data/config.json
+        # Create a temporary config that aligns strategy/model with .env
+        python - <<'PY'
+import json, os
+src = '/freqtrade/user_data/config.json'
+dst = '/tmp/config_webui.json'
+with open(src) as f:
+    conf = json.load(f)
+# Apply STRATEGY / FREQAIMODEL from env if set
+strategy = os.environ.get('STRATEGY')
+model = os.environ.get('FREQAIMODEL')
+if strategy:
+    conf['strategy'] = strategy
+if model:
+    conf['freqaimodel'] = model
+with open(dst,'w') as f:
+    json.dump(conf, f, indent=2)
+print(f'Wrote WebUI config to {dst} (strategy={conf.get("strategy")}, model={conf.get("freqaimodel")})')
+PY
+        exec freqtrade webserver --config /tmp/config_webui.json
 
   # Optional: classification run example (commented). Enable by uncommenting.
   # crypto-train-gpu-l4-cls:
