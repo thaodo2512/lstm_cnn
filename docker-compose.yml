@@ -137,6 +137,10 @@ services:
       PYTHONPATH: /workspace
       FREQAI_DEVICE: cuda
       MPLBACKEND: Agg
+      # Optional pre-downloads for backtest
+      TIMEFRAMES: ${TIMEFRAMES:-1h,5m}
+      BLOCKS: ${BLOCKS:-1}
+      BLOCK_DAYS: ${BLOCK_DAYS:-30}
       # Pairs override for backtest (optional)
       PAIRS: ${PAIRS:-}
       # Strategy / Model (overridable via .env)
@@ -180,6 +184,13 @@ services:
           python -c 'import json,os; src="/freqtrade/user_data/config.json"; dst="/tmp/config_backtest.json"; pairs=[p.strip() for p in os.environ.get("PAIRS","").split(",") if p.strip()]; conf=json.load(open(src)); exchange=conf.setdefault("exchange", {}); exchange["pair_whitelist"] = pairs if pairs else exchange.get("pair_whitelist", []); open(dst,"w").write(json.dumps(conf, indent=2)); print("Wrote temp backtest config {} with {} pairs".format(dst, len(pairs)))'
           CFG="/tmp/config_backtest.json"
         fi
+        echo "Ensuring historical OHLCV for backtest (timeframes=${TIMEFRAMES:-1h,5m}, timerange=${TIMERANGE:-20240101-20240201})";
+        bash /workspace/scripts/ensure_data_for_timeframes.sh \
+          "$$CFG" \
+          "${TIMEFRAMES:-1h,5m}" \
+          "${TIMERANGE:-20240101-20240201}" \
+          "${BLOCKS:-1}" \
+          "${BLOCK_DAYS:-30}" || true;
         exec freqtrade backtesting \
           --config "$$CFG" \
           --freqaimodel "${FREQAIMODEL:-HybridTimeseriesFreqAIModel_tinhn}" \
